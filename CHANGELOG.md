@@ -5,6 +5,29 @@ Todos los cambios relevantes de este proyecto se documentan en este archivo.
 El formato sigue las convenciones de [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y este proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 
+## [0.4.0] - 2026-08-13
+
+### Added
+
+- OpenAPI Quality Validator (`validator/`): analiza un documento OpenAPI 3.0.3 ya construido (`validate(document: dict) -> list[Diagnostic]`, más `validate_json`/`validate_yaml`), sin volver a analizar Java ni depender del Generator.
+- `validator/openapi_rules.py`: catálogo de reglas por sección del documento (raíz, paths/métodos HTTP, `operationId` con detección de colisiones, parameters, requestBody, responses/status codes, schemas incluidos array/object/string/number/enum, `$ref` internos, components, security), clasificadas ERROR/WARNING/INFO reutilizando `analyzer.Diagnostic`/`DiagnosticSeverity`.
+- `validator/openapi_validator.py`: orquestador con recorrido determinista explícito (paths/métodos/parameters/schemas siempre por clave ordenada, nunca por el orden de inserción del dict de entrada).
+- `Evidence` reutilizado sin modificar `analyzer/models.py`: `Evidence.file` contiene un JSON Pointer (RFC 6901) que ubica el hallazgo dentro del documento (p. ej. `/paths/~1api~1customers/get/responses`).
+- `$ref` externos (no `#/...`) detectados y declarados explícitamente (`OPENAPI_REF_EXTERNAL_SKIPPED`, INFO) en vez de ignorarse en silencio; nunca se resuelven ni se descargan.
+- Heurísticas de detección de convenciones fijas del Generator V0.3 por comparación literal de texto (`OPENAPI_GENERATOR_DEFAULT_RESPONSE_DESCRIPTION`, `OPENAPI_GENERATOR_PLACEHOLDER_INFO`), documentadas explícitamente como específicas de este proyecto, no como inferencia general de OpenAPI.
+- El Validator es de solo lectura: nunca modifica el documento recibido (verificado con tests de inmutabilidad).
+- 111 tests nuevos (149 → 260) en 4 archivos, organizados por área (documento/paths/operationId, parameters/requestBody/responses, schemas/`$ref`/components/security, parseo JSON-YAML + integración + determinismo + inmutabilidad sobre `examples/customer-service`).
+
+### Changed
+
+- `pyproject.toml`: versión `0.3.0` → `0.4.0`; se agrega `validator` a `tool.hatch.build.targets.wheel.packages`. Ninguna dependencia de runtime nueva (se reutiliza `PyYAML`, ya presente desde V0.3).
+
+### Scope
+
+- No se implementó Swagger UI/Editor, un validador OpenAPI completo, resolución de `$ref` externos, validación exhaustiva de flujos OAuth2, rangos de status code (`2XX`/`3XX`), CLI, CI/CD, Docker, Confluence, ni ningún proveedor LLM. Ver `docs/12-Roadmap.md`.
+- `analyzer/` y `generators/` no se modificaron: los 149 tests de V0.3 no se modificaron y continúan pasando.
+- **Nota:** el roadmap original agrupaba "Validator + Auditor" en V0.4; la directriz real de V0.4 acotó el alcance únicamente al OpenAPI Quality Validator. El Auditor queda sin versión asignada, pendiente de una futura directriz. El paquete `validators/` (plural, placeholder desde V0.1) no es el paquete de V0.4 — la directriz nombró el paquete nuevo `validator/` (singular); `validators/` permanece intacto y sin uso.
+
 ## [0.3.0] - 2026-08-13
 
 ### Added

@@ -7,8 +7,8 @@ completarse (criterios de aceptacion + Definition of Done) antes de iniciar la s
 |---------|--------|--------|
 | V0.1 | Foundation & Architecture | Completada (`v0.1.0`) |
 | V0.2 | Spring Boot Analyzer (Advanced) | Completada (`v0.2.0`) |
-| V0.3 | OpenAPI Generator | **Completada / esta version** |
-| V0.4 | Validator + Auditor | Futuro |
+| V0.3 | OpenAPI Generator | Completada (`v0.3.0`) |
+| V0.4 | OpenAPI Quality Validator | **Completada / esta version** |
 | V0.5 | LLM Providers | Futuro |
 | V0.6 | CLI | Futuro |
 | V0.7 | Confluence Integration | Futuro |
@@ -33,8 +33,14 @@ completarse (criterios de aceptacion + Definition of Done) antes de iniciar la s
   modificaciones al Analyzer. Ver `prompts/V0.3-OPENAPI-GENERATOR.md` y `docs/05-OpenAPI.md`. La
   transformacion **no** pasa por la Skill ni por un LLM Provider (ninguno de los dos existe
   todavia como implementacion): consume directamente la metadata del Analyzer.
-- **V0.4 — Validator + Auditor:** validacion estructural/semantica de la especificacion generada y
-  auditoria de trazabilidad/confidence.
+- **V0.4 — OpenAPI Quality Validator:** capa propia de validacion estructural y de calidad
+  (`validator.validate`/`validate_json`/`validate_yaml`) sobre documentos OpenAPI 3.0.3 ya
+  construidos, sin volver a analizar Java ni depender de una libreria de validacion externa.
+  Reutiliza `Diagnostic`/`DiagnosticSeverity`/`Evidence` del Analyzer (`Evidence.file` como JSON
+  Pointer RFC 6901). Ver `prompts/V0.4-OPENAPI-VALIDATOR.md` y `docs/05-OpenAPI.md`. **Nota:** el
+  roadmap original agrupaba "Validator + Auditor" en V0.4; la directriz real de V0.4 acoto el
+  alcance unicamente al Validator de OpenAPI — la Auditoria de trazabilidad/confidence permanece
+  sin version asignada, pendiente de una futura directriz.
 - **V0.5 — LLM Providers:** implementaciones concretas de la interfaz `LLMProvider` (Claude,
   Gemini, OpenAI u otros).
 - **V0.6 — CLI:** herramienta de linea de comandos que expone el pipeline completo.

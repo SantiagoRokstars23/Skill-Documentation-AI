@@ -1,9 +1,8 @@
 # 05 — OpenAPI
 
-> V0.3 implementa el OpenAPI Generator (`generators/`). Este documento describe el
-> comportamiento **real** de esa implementación. Lo que en V0.1/V0.2 era aspiracional
-> ("V0.3 lo implementará") ahora está construido; las secciones de este documento se
-> han actualizado para reflejarlo.
+> V0.3 implementa el OpenAPI Generator (`generators/`); V0.4 implementa el OpenAPI
+> Quality Validator (`validator/`). Este documento describe el comportamiento
+> **real** de ambas implementaciones.
 
 ## OpenAPI como contrato de salida
 
@@ -206,3 +205,106 @@ hechos estructurales, no el archivo literal).
 Swagger UI, Swagger Editor, un validador OpenAPI completo, generación de código
 cliente/servidor/SDK, documentación HTML, UI. Ver Scope Lock completo en
 `prompts/V0.3-OPENAPI-GENERATOR.md` sección 4.
+
+---
+
+## Quality Validator (V0.4)
+
+`validator/` analiza un documento OpenAPI **ya construido** (`dict`, o texto
+JSON/YAML) y detecta problemas estructurales y de calidad, sin volver a analizar
+Java ni llamar al Generator ni al Analyzer. Es de solo lectura: nunca modifica el
+documento recibido (verificado con tests de inmutabilidad).
+
+### Arquitectura
+
+```text
+documento OpenAPI (dict, o JSON/YAML)
+        |
+        v
+validator.validate(document) -> list[Diagnostic]
+validator.validate_json(text) / validator.validate_yaml(text)
+        |
+        +-- validator.openapi_rules  (funciones de regla por seccion del documento)
+```
+
+`validator/` no importa `javalang`, ningún motor interno del Analyzer, ni
+`generators/` (el Validator no llama al Generator; el Generator tampoco llama al
+Validator automáticamente — son componentes independientes, ver
+`docs/03-Arquitectura.md`).
+
+### API pública
+
+```python
+validate(document: dict) -> list[Diagnostic]
+validate_json(text: str) -> list[Diagnostic]
+validate_yaml(text: str) -> list[Diagnostic]
+```
+
+Sin `ValidationResult`: `list[Diagnostic]` alcanza (mismo patrón que
+`AnalysisResult.diagnostics` y `generators.generate()`). `validate_json`/
+`validate_yaml` nunca lanzan excepción ante entrada no parseable — devuelven un
+único `Diagnostic` (`OPENAPI_JSON_PARSE_ERROR`/`OPENAPI_YAML_PARSE_ERROR`).
+
+### Evidence: JSON Pointer
+
+Cada `Diagnostic` del Validator reutiliza `analyzer.Evidence` sin ninguna
+modificación a `analyzer/models.py`. `Evidence.file` contiene un **JSON Pointer**
+(RFC 6901) que ubica el fragmento del documento (p. ej.
+`/paths/~1api~1customers/get/responses`); `line`/`symbol` quedan en `None`
+(sin equivalente en un documento OpenAPI); `type` clasifica la ubicación
+(`"document"`, `"path"`, `"operation"`, `"parameter"`, `"requestBody"`,
+`"response"`, `"schema"`, `"ref"`, `"components"`, `"security"`).
+
+### Catálogo de reglas (resumen — ver `validator/openapi_rules.py` para el detalle exacto)
+
+**ERROR** (documento estructuralmente inválido): `openapi`/`info`/`paths` ausentes o
+mal tipados; versión fuera de `3.0.x`; path sin `/`; método HTTP desconocido; `{param}`
+de path sin definir; `operationId` duplicado o no-string; parámetro sin `name`/`in`,
+con `in` inválido, sin `schema`/`content` o con ambos a la vez, duplicado en el mismo
+scope; parámetro `in: path` sin `required: true`; `requestBody`/`responses` ausentes
+o mal formados; código de status inválido; `type` de schema desconocido; array sin
+`items`; objeto/string/number con constraints mal tipados o incoherentes; `enum` no
+es lista; `$ref` interno vacío, mal formado o inexistente; `components` o sus
+subsecciones mal tipadas; Security Scheme Object mal formado; `security` referencia
+un scheme inexistente; error de parseo JSON/YAML.
+
+**WARNING** (riesgo de calidad, no invalida el documento): operación/schema/response
+sin `description`; `x-security-evidence` presente (seguridad documentada solo como
+extensión, no como `securityScheme` real); `type: object` sin `properties` ni
+`additionalProperties`; `required` menciona un campo no declarado; `enum` con
+duplicados o con un valor incompatible con su `type`; nombre de componente con
+caracteres no permitidos; `x-security-evidence` con forma inesperada; **detección de
+convenciones fijas del Generator V0.3** (`OPENAPI_GENERATOR_DEFAULT_RESPONSE_DESCRIPTION`):
+comparación literal contra el texto exacto que produce `generators/openapi_generator.py`
+cuando no hay evidencia de descripción — es una heurística específica de este
+proyecto, no una inferencia general de OpenAPI, y deja de aplicar si ese texto
+cambia en el futuro.
+
+**INFO** (informativo): operación sin `security` ni evidencia; schema de
+`components.schemas` no referenciado por ningún `$ref`; versión `3.0.x` válida
+mas distinta de la referencia `3.0.3`; `paths` presente pero vacío; `$ref` externo
+detectado (no se resuelve, se declara explícitamente en vez de ignorarlo); `info.title`/
+`info.version` coincide con el placeholder fijo del Generator V0.3
+(`OPENAPI_GENERATOR_PLACEHOLDER_INFO`).
+
+**Explícitamente no implementado** (Scope Lock V0.4): `allOf`/`oneOf`/`anyOf`/`not`,
+resolución de `$ref` externos, validación exhaustiva de flujos OAuth2, rangos de
+status code tipo `2XX`/`3XX`, cualquier librería de validación OpenAPI externa.
+
+### Comportamiento esperado contra el ejemplo real
+
+El documento generado por V0.3 para `examples/customer-service` es estructuralmente
+sano por construcción: **0 diagnostics ERROR**. Sin embargo, produce un volumen
+considerable de WARNING/INFO (~57 en la versión actual del ejemplo) porque el
+Generator nunca escribe `description`, nunca declara `security`/`securitySchemes`
+reales, y usa los placeholders fijos de `info`/`responses` — exactamente lo que las
+reglas de calidad están diseñadas para señalar. Esto es el comportamiento
+**esperado**, no un indicio de que el Validator o el Generator estén rotos.
+
+### Determinismo
+
+`document["paths"]` se recorre por clave ordenada; los métodos dentro de cada path,
+por orden alfabético fijo; `parameters` por `(in, name)`; `components.schemas`/
+`securitySchemes` por nombre. `validate()` nunca depende del orden de inserción del
+`dict` de entrada (verificado con un test que compara el mismo contenido semántico
+insertado en dos órdenes distintos) ni usa hashes/UUIDs/timestamps.

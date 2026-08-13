@@ -48,6 +48,14 @@ unica y limites claros; ningun componente superior debe acoplarse a un proveedor
    estructurales del formato de salida (p. ej. `info.title`/`info.version`, obligatorios en
    OpenAPI, sin fuente de evidencia posible), debe quedar explicitamente documentada como
    convencion, nunca presentada como si viniera del codigo analizado. Ver `docs/05-OpenAPI.md`.
+8. **(V0.4) La misma regla de evidencia aplica al Validator.** El OpenAPI Quality Validator solo
+   reporta problemas que puede demostrar a partir de la estructura del documento recibido: no
+   resuelve `$ref` externos (los declara explicitamente como no evaluados, en vez de ignorarlos en
+   silencio o tratarlos como invalidos), no valida semanticamente si un status code corresponde al
+   comportamiento real del codigo Java (eso es Drift Detection, fuera de alcance), y sus
+   heuristicas de deteccion de convenciones del Generator (`OPENAPI_GENERATOR_*`) se basan en
+   comparacion literal de texto, documentada explicitamente como heuristica especifica del
+   proyecto y no como inferencia general de OpenAPI. Ver `docs/05-OpenAPI.md`.
 
 ## Reglas de desarrollo
 
@@ -64,19 +72,32 @@ las versiones del proyecto, no solo a V0.1.
 - El Analyzer no depende de la Skill, el LLM Provider, ni de OpenAPI.
 - La Skill no depende de un LLM concreto ni contiene instrucciones exclusivas de una herramienta.
 - Toda interaccion con un LLM pasa por la interfaz `LLMProvider` (`providers/base.py`).
-- `validators/` permanece como paquete placeholder hasta que V0.4 lo implemente. `generators/`
-  dejo de ser placeholder en V0.3 (OpenAPI Generator).
+- `validators/` (plural) permanece como paquete placeholder sin uso — **no** es el paquete de
+  V0.4 (ver nota de nomenclatura mas abajo). `generators/` (V0.3) y `validator/` (singular, V0.4)
+  ya tienen implementacion real.
 - (V0.3) El Generator (`generators/`) no importa `javalang` ni ningun motor interno del Analyzer
   (`spring_boot_analyzer.py`, `ast_analyzer.py`, `dto_analyzer.py`, `scanner.py`): solo el modelo
   publico de `analyzer`. Analyzer y Generator son responsabilidades separadas (`Java -> Metadata`
   vs. `Metadata -> OpenAPI`) y no deben mezclarse (ver `docs/03-Arquitectura.md`).
-- (V0.3) **Antes de modificar `analyzer/models.py` para dar soporte a un componente rio abajo**
-  (Generator, Validator, Auditor), debe demostrarse que el dato faltante no puede derivarse del
-  modelo existente: identificar la informacion requerida, verificar si ya existe en
-  `AnalysisResult`/`Endpoint`/`Parameter`/`DTO`/`Field`/`Response`, y solo si genuinamente no
-  puede obtenerse sin modificar el Analyzer, proponer la ampliacion (proceso obligatorio usado en
-  V0.3, seccion 6 de `prompts/V0.3-OPENAPI-GENERATOR.md` — se mantiene como patron para futuras
-  versiones). No agregar campos "por si acaso" ni entidades por simetria.
+- (V0.4) El Validator (`validator/`) no importa `javalang`, ningun motor interno del Analyzer, ni
+  `generators/` (no llama a `generate()`). El Generator tampoco llama al Validator
+  automaticamente: son componentes independientes que solo comparten el `dict` del documento
+  OpenAPI como interfaz (`OpenAPI -> Validator`, no `Generator -> Validator`).
+- (V0.3, reafirmado en V0.4) **Antes de modificar `analyzer/models.py` para dar soporte a un
+  componente rio abajo** (Generator, Validator, Auditor), debe demostrarse que el dato faltante no
+  puede derivarse del modelo existente: identificar la informacion requerida, verificar si ya
+  existe en `AnalysisResult`/`Endpoint`/`Parameter`/`DTO`/`Field`/`Response`/`Diagnostic`/
+  `Evidence`, y solo si genuinamente no puede obtenerse sin modificar el Analyzer, proponer la
+  ampliacion (proceso obligatorio usado en V0.3 y V0.4 — se mantiene como patron para futuras
+  versiones). No agregar campos "por si acaso" ni entidades por simetria. V0.4 confirmo que
+  `Evidence.file` puede reutilizarse por convencion (JSON Pointer RFC 6901) sin necesidad de
+  ningun campo nuevo — este es el patron a seguir antes de proponer ampliar `Evidence`/
+  `Diagnostic` en el futuro.
+- (V0.4) **Nota de nomenclatura permanente:** el roadmap original de V0.1 reservo `validators/`
+  (plural) como placeholder para un futuro "Validator" generico. La directriz real de V0.4 creo
+  el paquete `validator/` (singular) para el OpenAPI Quality Validator especifico. Ambos paquetes
+  coexisten; `validators/` sigue sin implementacion. Cualquier trabajo futuro sobre "el Validator"
+  debe aclarar cual de los dos nombres corresponde antes de modificar nada.
 - (V0.2) Cualquier dependencia de terceros que el Analyzer necesite para parsear/interpretar
   codigo debe aislarse detras de un modulo propio (patron establecido por
   `analyzer/ast_backend.py` para `javalang`): el resto del Analyzer no debe importar el paquete
@@ -117,6 +138,15 @@ como fuente unica de verdad cuando exista informacion deterministica disponible.
 - (V0.3) Golden files limitados: se permite regenerar y validar hechos estructurales sobre
   `examples/customer-service` (paths/operaciones/schemas/algunos `$ref` presentes), pero **no**
   comparar archivos generados byte a byte (fragil ante cambios de formato intencionales).
+- (V0.4) El Validator debe tener tests para: documento raiz, paths/metodos HTTP, colisiones de
+  `operationId` (mismo path, distinto path, mas de 2 duplicados), parameters (cada `in`, duplicados,
+  conflicto schema/content, path sin `required: true`), requestBody, responses/status codes,
+  schemas (primitive/array/object/enum, constraints incoherentes), `$ref` (valido/inexistente/
+  invalido/externo), components, security, parseo JSON/YAML valido e invalido, e **inmutabilidad**
+  (`document == deepcopy(document)` despues de `validate(document)`) y **determinismo** (misma
+  lista de diagnostics en llamadas repetidas y ante distinto orden de insercion del dict de
+  entrada) como tests explicitos y obligatorios, no opcionales (seccion 27-29 de
+  `prompts/V0.4-OPENAPI-VALIDATOR.md`).
 
 ## Reglas de documentacion
 

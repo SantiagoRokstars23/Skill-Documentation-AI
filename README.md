@@ -17,11 +17,11 @@ Reducir ese problema mediante automatizacion, analisis estatico deterministico d
 capacidades de LLM controladas por una Skill especializada, manteniendo el sistema independiente
 de cualquier proveedor de LLM concreto. Ver `docs/02-Objetivos.md`.
 
-## Estado actual — V0.3 (OpenAPI Generator)
+## Estado actual — V0.4 (OpenAPI Quality Validator)
 
-**Funcional: el Analyzer y el OpenAPI Generator.** El resto de componentes (Skill como motor
-ejecutable, LLM Provider concreto, Validator, Auditor, CLI, integraciones) estan definidos y
-documentados, pero no implementados. Ver `docs/12-Roadmap.md`.
+**Funcional: el Analyzer, el OpenAPI Generator y el OpenAPI Quality Validator.** El resto de
+componentes (Skill como motor ejecutable, LLM Provider concreto, Auditor, CLI, integraciones)
+estan definidos y documentados, pero no implementados. Ver `docs/12-Roadmap.md`.
 
 Funcionalidad disponible hoy:
 
@@ -44,9 +44,16 @@ Funcionalidad disponible hoy:
   conservadoras documentadas cuando falta evidencia (nunca `200 application/json` por defecto). Ver
   `docs/05-OpenAPI.md`.
 - Serializacion a JSON (libreria estandar) y YAML (`PyYAML`).
-- Ni el Analyzer ni el Generator inventan informacion: cuando un dato no puede determinarse con
-  confianza (p. ej. un nombre de DTO ambiguo, un endpoint sin evidencia de codigo de respuesta), se
-  registra un `Diagnostic` en vez de suponerse (ver `docs/09-Auditoria.md`).
+- **Validacion de calidad del documento OpenAPI generado** (`validator.validate`): reglas
+  estructurales (paths, metodos HTTP, `operationId` unico, parameters, requestBody, responses,
+  schemas, `$ref` internos, components, security) clasificadas en ERROR/WARNING/INFO, mas
+  deteccion de senales de calidad (descripciones ausentes, seguridad documentada solo como
+  extension, schemas no referenciados). El Validator es de solo lectura y no vuelve a analizar
+  Java. Ver `docs/05-OpenAPI.md`.
+- Ni el Analyzer, ni el Generator, ni el Validator inventan informacion: cuando un dato no puede
+  determinarse con confianza (p. ej. un nombre de DTO ambiguo, un endpoint sin evidencia de
+  codigo de respuesta, un `$ref` que no resuelve), se registra un `Diagnostic` en vez de
+  suponerse (ver `docs/09-Auditoria.md`).
 
 ## Arquitectura (resumen)
 
@@ -55,17 +62,18 @@ Microservicio Spring Boot -> Analyzer -> Evidence/Metadata -> Skill -> LLM Provi
     -> OpenAPI Generator -> Validator -> Auditor -> OpenAPI
 ```
 
-El proyecto implementa los tramos `Microservicio Spring Boot -> Analyzer -> Evidence/Metadata` y
-`Evidence/Metadata -> OpenAPI Generator -> OpenAPI` (esta ultima transformacion no pasa todavia por
-la Skill ni por un LLM Provider, que no tienen implementacion concreta). Detalle completo en
+El proyecto implementa `Microservicio Spring Boot -> Analyzer -> Evidence/Metadata`,
+`Evidence/Metadata -> OpenAPI Generator -> OpenAPI`, y `OpenAPI -> Validator -> Diagnostics`
+(la transformacion a OpenAPI no pasa todavia por la Skill ni por un LLM Provider, que no tienen
+implementacion concreta; el Auditor tampoco esta implementado). Detalle completo en
 `docs/03-Arquitectura.md`.
 
 ## Stack
 
 - **Lenguaje:** Python >= 3.11.
 - **Dependencias de runtime:** `javalang` (parser AST de Java, motor principal del Analyzer desde
-  V0.2) y `PyYAML` (serializacion YAML del OpenAPI Generator, V0.3) — ver decisiones documentadas
-  en `docs/03-Arquitectura.md`.
+  V0.2) y `PyYAML` (serializacion YAML del OpenAPI Generator y parseo YAML del Validator, desde
+  V0.3) — ver decisiones documentadas en `docs/03-Arquitectura.md`.
 - **Dependencias de desarrollo:** `pytest` para testing.
 
 ## Estructura del proyecto
@@ -82,9 +90,10 @@ Skill-Documentation-AI/
 ├── skill/           Skill de documentacion (SKILL.md, rules/, references/, templates/)
 ├── providers/       Interfaz de LLM Provider (sin implementaciones concretas)
 ├── analyzer/        Analyzer funcional para Java/Spring Boot (motor AST + fallback regex)
-├── validators/       Placeholder, reservado para V0.4
+├── validators/       Placeholder sin uso (ver nota de nomenclatura en docs/03-Arquitectura.md)
 ├── generators/       OpenAPI Generator funcional (AnalysisResult -> OpenAPI 3.0.3)
-├── tests/           Tests del Analyzer y del OpenAPI Generator
+├── validator/        OpenAPI Quality Validator funcional (documento OpenAPI -> Diagnostics)
+├── tests/           Tests del Analyzer, del Generator y del Validator
 └── examples/        Microservicio Spring Boot de ejemplo (+ openapi.yaml/openapi.json generados)
 ```
 
@@ -104,12 +113,13 @@ pip install -e ".[dev]"
 
 ## Ejecucion
 
-No hay una CLI todavia (reservada para V0.6). El Analyzer y el Generator se usan como libreria
-Python:
+No hay una CLI todavia (reservada para V0.6). El Analyzer, el Generator y el Validator se usan
+como libreria Python:
 
 ```python
 from analyzer import analyze_project
 from generators import generate, to_yaml, to_json
+from validator import validate
 
 result = analyze_project("examples/customer-service")
 
@@ -121,6 +131,9 @@ print(result.to_json())
 document, diagnostics = generate(result)
 print(to_yaml(document))
 for diagnostic in diagnostics:
+    print(diagnostic.severity.value, diagnostic.code, diagnostic.message)
+
+for diagnostic in validate(document):
     print(diagnostic.severity.value, diagnostic.code, diagnostic.message)
 ```
 
@@ -154,13 +167,19 @@ fallback (sintaxis Java invalida a proposito). Ver `examples/README.md`.
   OpenAPI (no hay evidencia suficiente para elegir uno); se documenta como extension
   `x-security-evidence`.
 - `Map<K,V>` se representa como `type: object` generico, sin `additionalProperties` tipado.
-- No hay validacion de OpenAPI, auditoria, CLI ni integracion con Confluence todavia.
+- El Validator no resuelve `$ref` externos (los detecta y los declara como `INFO`, sin
+  descargarlos ni validarlos), no implementa `allOf`/`oneOf`/`anyOf`, ni valida flujos OAuth2 en
+  profundidad. Contra el documento real de `examples/customer-service` produce 0 diagnostics
+  ERROR pero un volumen considerable de WARNING/INFO (sin `description` en ningun lado, sin
+  `security` real) — comportamiento esperado, no un indicio de error. Ver `docs/05-OpenAPI.md`.
+- No hay auditoria, CLI ni integracion con Confluence todavia.
 - No existen implementaciones concretas de proveedores LLM; solo la interfaz (`providers/base.py`).
 
 ## Roadmap
 
-Ver `docs/12-Roadmap.md`. Resumen: V0.4 Validator + Auditor, V0.5 LLM Providers, V0.6 CLI, V0.7
-Confluence Integration, V1.0 Production, V2.0 Documentation Quality Gate, V3.0 Drift Detection.
+Ver `docs/12-Roadmap.md`. Resumen: V0.5 LLM Providers, V0.6 CLI, V0.7 Confluence Integration,
+V1.0 Production, V2.0 Documentation Quality Gate, V3.0 Drift Detection. (El Auditor, originalmente
+agrupado con el Validator en V0.4, queda sin version asignada.)
 
 ## Futuras integraciones
 

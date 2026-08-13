@@ -62,3 +62,22 @@ y en ningun caso se demostro necesaria una ampliacion del modelo del Analyzer (v
 Se agrega el paquete `generators/` con implementacion real (antes placeholder) y una dependencia
 de runtime nueva: `PyYAML>=6.0,<7.0` (MIT, usada exclusivamente para serializacion YAML). No se
 agrego ninguna libreria de validacion ni especifica de OpenAPI (Scope Lock V0.3).
+
+### V0.3.0 -> V0.4.0
+
+**Sin cambios en `analyzer/` ni en `generators/`.** V0.4 (OpenAPI Quality Validator) no modifico
+ningun archivo de ninguno de los dos paquetes. El proceso obligatorio de la seccion 6 de
+`prompts/V0.4-OPENAPI-VALIDATOR.md` se aplico a la unica necesidad de datos identificada
+(ubicacion del hallazgo dentro del documento OpenAPI) y se resolvio reutilizando
+`Evidence.file`/`Evidence.type` por convencion (JSON Pointer RFC 6901), sin ampliar
+`analyzer/models.py` (ver `docs/03-Arquitectura.md`, decision 9). Los 149 tests de V0.3
+permanecen sin modificar.
+
+Se agrega el paquete `validator/` (nuevo, funcional desde su creacion). Ninguna dependencia de
+runtime nueva: se reutiliza `PyYAML` (ya presente desde V0.3). No se agrego ninguna libreria de
+validacion OpenAPI externa (Scope Lock V0.4).
+
+**Nota de nomenclatura:** el paquete `validators/` (plural), reservado como placeholder desde
+V0.1 para un futuro "Validator", **no** es el paquete que implementa V0.4 — la directriz real
+nombro el paquete nuevo `validator/` (singular). `validators/` permanece intacto, sin uso, sin
+eliminarse (ver `docs/03-Arquitectura.md`).

@@ -136,18 +136,41 @@ componente mas abajo).
   cada dato faltante era realmente necesario antes de tocar el modelo del Analyzer, y en ningun
   caso lo fue.
 
-### Validator (no implementado en V0.1)
+### OpenAPI Quality Validator (implementado en V0.4)
 
-- **Responsabilidad futura:** validar la especificacion OpenAPI generada (estructural y
-  semanticamente) y clasificar hallazgos en errores/warnings/info.
-- Reservado para V0.4. Ver `docs/08-Validacion.md`.
-- V0.1 crea unicamente el paquete `validators/` como placeholder documentado.
+- **Responsabilidad:** analizar un documento OpenAPI 3.0.3 ya construido (`validator.validate`)
+  y clasificar hallazgos en ERROR/WARNING/INFO. No analiza Java, no llama al Analyzer ni al
+  Generator, y nunca modifica el documento recibido (solo lectura).
+- **Entrada:** un `dict` (documento OpenAPI), o texto JSON/YAML (`validate_json`/`validate_yaml`).
+- **Salida:** `list[Diagnostic]`, reutilizando `analyzer.Diagnostic`/`DiagnosticSeverity`/
+  `Evidence` sin ninguna modificacion a `analyzer/models.py` (`Evidence.file` como JSON Pointer
+  RFC 6901, ver `docs/05-OpenAPI.md`).
+- **Dependencias externas:** ninguna nueva; reutiliza `PyYAML` (ya presente desde V0.3) para
+  `validate_yaml`. Sin libreria de validacion OpenAPI externa (Scope Lock explicito de V0.4).
+- **Estructura interna:**
+  - `validator/openapi_rules.py` — funciones de regla agrupadas por seccion del documento
+    (raiz, paths/metodos, operationId, parameters, requestBody, responses, schemas/enum, `$ref`,
+    components, security).
+  - `validator/openapi_validator.py` — orquestador: `validate`/`validate_json`/`validate_yaml`,
+    recorrido deterministico del documento.
+  - `validator/__init__.py` — API publica.
+- Detalle completo (catalogo de reglas, severidades, politica de `$ref` externos, heuristicas de
+  deteccion de convenciones del Generator) en `docs/05-OpenAPI.md`.
+- **No se modifico `analyzer/models.py` ni `generators/`** durante su implementacion (mismo
+  proceso obligatorio que V0.3, ver decision 9 mas abajo).
+- **Nota de nomenclatura:** V0.1 habia reservado el paquete `validators/` (plural) como
+  placeholder generico para un futuro "Validator". La directriz real de V0.4 nombra el paquete
+  nuevo `validator/` (singular). Ambos coexisten: `validators/` permanece exactamente como
+  placeholder vacio (sin uso, no se elimino sin autorizacion); `validator/` es el paquete
+  funcional real de V0.4.
 
-### Auditor (no implementado en V0.1)
+### Auditor (no implementado)
 
 - **Responsabilidad futura:** evaluar trazabilidad, evidencia y confianza (confidence) de la
   documentacion generada.
-- Reservado para V0.4. Ver `docs/09-Auditoria.md`.
+- El roadmap original lo agrupaba junto con el Validator en V0.4; la directriz real de V0.4 acoto
+  el alcance unicamente al OpenAPI Quality Validator (ver arriba). El Auditor queda sin version
+  asignada, pendiente de una futura directriz. Ver `docs/09-Auditoria.md` y `docs/12-Roadmap.md`.
 
 ### CLI (no implementado en V0.1)
 
@@ -160,7 +183,7 @@ componente mas abajo).
 - Integracion con Confluence y con el proyecto Python existente. Reservado para V0.7. Ver
   `docs/11-Integracion.md`.
 
-## Flujo de informacion (V0.2)
+## Flujo de informacion (V0.4)
 
 ```text
 Codigo fuente Java/Spring Boot
@@ -189,12 +212,20 @@ analyzer.ast_analyzer            |
         |
         v
    documento OpenAPI (dict) -> generators.to_json / generators.to_yaml
+        |
+        v
+   validator.validate(documento)    (V0.4 — Quality Validator, solo lectura)
+        |
+        v
+   list[Diagnostic]   (ERROR/WARNING/INFO sobre el documento)
 ```
 
 El resultado del Analyzer fue diseñado en V0.1/V0.2 para ser consumido por un futuro OpenAPI
 Generator sin necesidad de romper compatibilidad (ver `docs/07-Analisis.md` y
 `docs/13-Versionado.md`); V0.3 confirma esa expectativa: no fue necesario modificar ningun campo
-de `analyzer/models.py` para implementar el Generator.
+de `analyzer/models.py` para implementar el Generator. V0.4 confirma lo mismo para el Validator:
+tampoco fue necesario modificar `analyzer/models.py` (reutiliza `Diagnostic`/`Evidence` tal como
+estaban) ni `generators/` (el Validator consume el `dict` de salida, no llama a `generate()`).
 
 ## Limites entre componentes
 
@@ -202,7 +233,8 @@ de `analyzer/models.py` para implementar el Generator.
 - La Skill **no** depende de un LLM concreto ni contiene instrucciones exclusivas de Claude.
 - El LLM Provider es una interfaz; ningun componente superior debe importar un SDK de un
   proveedor especifico directamente.
-- `validators/` y `generators/` existen como paquetes reservados, sin logica de negocio.
+- `validators/` (placeholder, sin uso desde V0.1) existe como paquete reservado sin logica de
+  negocio. `generators/` (V0.3) y `validator/` (V0.4) ya tienen implementacion real.
 - Dentro del Analyzer (V0.2): unicamente `analyzer/ast_backend.py` importa `javalang`. Los demas
   modulos (`ast_analyzer.py`, `dto_analyzer.py`, `__init__.py`) solo conocen el resultado de sus
   utilidades (texto, dicts, nodos ya normalizados via `annotation_args`/`literal_text`/
@@ -214,6 +246,10 @@ de `analyzer/models.py` para implementar el Generator.
   Este limite es la contraparte, del lado del Generator, del limite ya existente "el Analyzer no
   conoce la Skill/LLM/OpenAPI": ninguno de los dos componentes conoce los detalles internos del
   otro, solo la estructura de datos que los conecta (`AnalysisResult`).
+- (V0.4) El Validator (`validator/`) **no** importa `javalang` ni ningun modulo interno del
+  Analyzer, y tampoco importa `generators/` (no llama a `generate()`). El Generator, a su vez, no
+  llama al Validator automaticamente. Ambos son componentes independientes que solo comparten el
+  `dict` del documento OpenAPI como interfaz (verificado por grep sobre `validator/*.py`).
 
 ## Decisiones arquitectonicas relevantes
 
@@ -273,8 +309,9 @@ de `analyzer/models.py` para implementar el Generator.
    concretas, para evitar acoplamiento a un LLM especifico y cumplir el Scope Lock. Sin cambios
    en V0.2 (seccion 15 de la directriz V0.2 lo reitera explicitamente).
 
-7. **`validators/` se mantiene vacio/placeholder**: su logica pertenece a V0.4. `generators/` dejo
-   de ser placeholder en V0.3 (ver punto 8).
+7. **`validators/` (plural) se mantiene vacio/placeholder**: la directriz real de V0.4 nombro su
+   paquete nuevo `validator/` (singular, ver punto 9), no `validators/`. `generators/` dejo de ser
+   placeholder en V0.3 (ver punto 8).
 
 8. **V0.3 — OpenAPI 3.0.3, sin modificar el Analyzer.** Antes de implementar, se aplico
    sistematicamente el proceso obligatorio de la seccion 6 de
@@ -291,3 +328,19 @@ de `analyzer/models.py` para implementar el Generator.
    libreria de validacion. Dependencia nueva: `PyYAML` (MIT, solo para serializacion YAML; JSON
    usa la libreria estandar). Ver `docs/05-OpenAPI.md` para el detalle completo de las politicas
    conservadoras (responses sin status, security sin scheme concreto, tipos no resueltos).
+
+9. **V0.4 — Validator propio y acotado, sin libreria externa, sin modificar Analyzer ni
+   Generator.** Mismo proceso obligatorio de la seccion 6 aplicado a la unica necesidad de datos
+   identificada (ubicacion del hallazgo dentro del documento): se resolvio reutilizando
+   `Evidence.file` como JSON Pointer (RFC 6901) por convencion, sin agregar ningun campo a
+   `analyzer/models.py`. Arquitectura elegida: modular (`validator/openapi_rules.py` +
+   `validator/openapi_validator.py`), replicando el patron ya usado por `generators/` (orquestador
+   separado de las funciones de regla). Se descarto explicitamente cualquier libreria de
+   validacion OpenAPI (`openapi-spec-validator`, `jsonschema`, etc. — Scope Lock V0.4). El
+   catalogo de reglas incluye ~15 extensiones propuestas mas alla de los ejemplos literales de la
+   directriz (autorizadas explicitamente: `OPENAPI_PARAMETER_SCHEMA_CONTENT_CONFLICT`,
+   `OPENAPI_PARAMETER_DUPLICATE`, `OPENAPI_REQUIRED_FIELD_UNDEFINED`,
+   `OPENAPI_COMPONENT_NAME_INVALID`, deteccion de convenciones fijas del Generator V0.3 por
+   comparacion literal de texto, entre otras), documentadas explicitamente como tales para no
+   confundirlas con requisitos literales de la directriz. Ver `docs/05-OpenAPI.md` para el
+   catalogo completo y las severidades.
