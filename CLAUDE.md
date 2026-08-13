@@ -30,6 +30,16 @@ unica y limites claros; ningun componente superior debe acoplarse a un proveedor
 3. Nunca se presenta una inferencia como un hecho; la incertidumbre se conserva explicitamente.
 4. Cada componente mantiene una responsabilidad clara y el minimo acoplamiento necesario.
 5. Simplicidad y mantenibilidad por encima de cobertura funcional prematura.
+6. **(V0.2) El Analyzer produce evidencia, no inferencias.** Si un dato no puede determinarse de
+   forma suficientemente confiable a partir del codigo analizado, debe registrarse como
+   desconocido (`None`/vacio) y, cuando corresponda, generar un `Diagnostic`
+   (`docs/09-Auditoria.md`) — nunca inventarse ni completarse por suposicion. Esta regla es
+   fundamental para **todo** el proyecto, no solo para el Analyzer: la metadata que produce sera
+   consumida por un LLM en fases futuras (V0.3+) para documentar el microservicio, y el objetivo
+   es que el LLM documente lo que realmente existe en el codigo, no que "complete" lo que no
+   encontro. Ejemplos ya implementados: un nombre de DTO ambiguo entre archivos no se resuelve al
+   azar (`docs/07-Analisis.md`); un mapping sin metodo HTTP resoluble se omite en vez de asumir
+   uno por defecto.
 
 ## Reglas de desarrollo
 
@@ -48,6 +58,15 @@ las versiones del proyecto, no solo a V0.1.
 - Toda interaccion con un LLM pasa por la interfaz `LLMProvider` (`providers/base.py`).
 - `validators/` y `generators/` permanecen como paquetes placeholder hasta que su version
   correspondiente (V0.4 y V0.3) los implemente.
+- (V0.2) Cualquier dependencia de terceros que el Analyzer necesite para parsear/interpretar
+  codigo debe aislarse detras de un modulo propio (patron establecido por
+  `analyzer/ast_backend.py` para `javalang`): el resto del Analyzer no debe importar el paquete
+  de terceros directamente ni depender de su superficie de excepciones. Ver decision
+  arquitectonica 3 en `docs/03-Arquitectura.md`.
+- (V0.2) Un motor de analisis nuevo no reemplaza a uno anterior salvo autorizacion explicita y
+  justificacion documentada de la perdida de comportamiento (Regla 9 de compatibilidad). El
+  patron establecido es *motor principal + fallback*, no sustitucion (ver
+  `analyzer/__init__.py::analyze_project`).
 
 ## Reglas de IA
 
@@ -62,7 +81,13 @@ como fuente unica de verdad cuando exista informacion deterministica disponible.
 - El Analyzer debe tener tests para: deteccion de Controllers, mappings, metodos HTTP,
   PathVariable, RequestParam, RequestBody, casos validos, casos limite, y proyectos
   incompletos/estructuras inesperadas (seccion 20 de `prompts/V0.1-foundation.md`).
-- Los tests deben ser reproducibles (`pytest`, sin dependencias externas de red o entorno).
+- (V0.2) Ademas: DTOs (simples, anidados, colecciones, enums, ambiguos, ciclicos), validaciones,
+  headers, seguridad, consumes/produces, multiples `RequestMethod`, anotaciones fully-qualified,
+  metodos package-private, y el mecanismo de fallback AST-a-regex (seccion 9 de
+  `prompts/V0.2-ADVANCED-SPRING-BOOT-ANALYZER.md`).
+- Los tests deben ser reproducibles (`pytest`, sin dependencias externas de red o entorno). Los
+  tests que ejercitan directamente el motor de fallback importan `spring_boot_analyzer` o pasan
+  codigo Java deliberadamente invalido para forzar esa ruta.
 
 ## Reglas de documentacion
 

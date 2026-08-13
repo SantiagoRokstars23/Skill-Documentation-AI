@@ -32,3 +32,21 @@ corresponder a la version de la directriz completada mas recientemente.
 - Un cambio que elimine o modifique el significado de un campo existente de la metadata requiere
   una entrada explicita en `CHANGELOG.md` y, si aplica, un incremento de versionado MAJOR una vez
   el proyecto alcance `1.0.0`.
+
+### V0.1.0 -> V0.2.0
+
+Todos los campos nuevos de `Endpoint`, `Parameter` y `Evidence` (V0.2) tienen valores por defecto:
+el codigo que construye estas estructuras posicionalmente/por palabra clave como en V0.1 sigue
+funcionando sin cambios (`analyzer/spring_boot_analyzer.py`, el motor de fallback, no se modifico).
+`AnalysisResult` gano `controllers` y `diagnostics`; `warnings` se mantiene con el mismo
+comportamiento observable.
+
+**Excepcion documentada (Regla 7 de la directriz V0.2):** la forma exacta del diccionario devuelto
+por `to_dict()` en `Parameter`/`Endpoint` **si** cambio (se agregaron claves nuevas:
+`default_value`, `validations`, `dto` en `Parameter`; `symbol`/`type` en `Evidence`; `java_method`,
+`consumes`, `produces`, `response`, `security` en `Endpoint`). Cualquier consumidor que compare el
+resultado de `to_dict()` contra un diccionario exacto (en vez de leer claves especificas) vera mas
+claves de las que existian en V0.1. Esto es intencional: es precisamente la funcionalidad que V0.2
+debia agregar (seccion 5 de `prompts/V0.2-ADVANCED-SPRING-BOOT-ANALYZER.md`). Los dos tests de
+V0.1 que hacian esa comparacion exacta (`tests/test_models.py`) se actualizaron para reflejar la
+forma completa, sin reducir lo que verifican.

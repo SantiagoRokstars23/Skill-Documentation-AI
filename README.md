@@ -16,19 +16,32 @@ Reducir ese problema mediante automatizacion, analisis estatico deterministico d
 capacidades de LLM controladas por una Skill especializada, manteniendo el sistema independiente
 de cualquier proveedor de LLM concreto. Ver `docs/02-Objetivos.md`.
 
-## Estado actual — V0.1 (Foundation & Architecture)
+## Estado actual — V0.2 (Advanced Spring Boot Analyzer)
 
-Esta version establece las bases del proyecto. **Lo unico funcional en V0.1 es el Analyzer.** El
-resto de componentes (Skill, LLM Provider, OpenAPI Generator, Validator, Auditor, CLI,
-integraciones) estan definidos y documentados, pero no implementados. Ver `docs/12-Roadmap.md`.
+**Lo unico funcional del proyecto es el Analyzer.** El resto de componentes (Skill, LLM Provider,
+OpenAPI Generator, Validator, Auditor, CLI, integraciones) estan definidos y documentados, pero no
+implementados. Ver `docs/12-Roadmap.md`.
 
 Funcionalidad disponible hoy:
 
-- Analisis estatico de un proyecto Java/Spring Boot.
-- Deteccion de `@RestController`, mappings HTTP (`@GetMapping`, `@PostMapping`, `@PutMapping`,
-  `@DeleteMapping`, `@PatchMapping`, `@RequestMapping`), paths, `@PathVariable`, `@RequestParam` y
-  `@RequestBody`.
-- Generacion de metadata estructurada y serializable (JSON) de los endpoints detectados.
+- Analisis estatico de un proyecto Java/Spring Boot mediante un **motor hibrido**: un parser AST
+  (`javalang`) como motor principal, con el motor de V0.1 (regex + balance de brackets) como
+  *fallback* automatico por archivo cuando el AST no puede parsear un archivo especifico (sintaxis
+  no soportada o codigo malformado). Ver `docs/07-Analisis.md`.
+- Deteccion de `@RestController`/`@Controller`, mappings HTTP (`@GetMapping`, `@PostMapping`,
+  `@PutMapping`, `@DeleteMapping`, `@PatchMapping`, `@RequestMapping` — incluyendo multiples
+  metodos HTTP y anotaciones fully-qualified), paths, `@PathVariable`, `@RequestParam`,
+  `@RequestBody`, `@RequestHeader`.
+- Resolucion de **DTOs** referenciados entre archivos del proyecto (campos, tipos, colecciones,
+  DTOs anidados, enums) y de anotaciones de **Bean Validation** (`@NotBlank`, `@Size`, `@Email`,
+  etc.) sobre campos y parametros.
+- Analisis de **respuesta** (`ResponseEntity<T>`, colecciones, `@ResponseStatus`), de
+  `consumes`/`produces`, y evidencia de **seguridad** (`@PreAuthorize`, `@Secured`).
+- Generacion de metadata estructurada y serializable (JSON) de endpoints, controllers, DTOs y
+  diagnostics.
+- El Analyzer **nunca inventa informacion**: cuando un dato no puede determinarse con confianza
+  (p. ej. un nombre de DTO ambiguo entre archivos), se registra un `Diagnostic` en vez de
+  suponerse (ver `docs/09-Auditoria.md`).
 
 ## Arquitectura (resumen)
 
@@ -37,13 +50,14 @@ Microservicio Spring Boot -> Analyzer -> Evidence/Metadata -> Skill -> LLM Provi
     -> OpenAPI Generator -> Validator -> Auditor -> OpenAPI
 ```
 
-V0.1 implementa unicamente el tramo `Microservicio Spring Boot -> Analyzer -> Evidence/Metadata`.
-Detalle completo en `docs/03-Arquitectura.md`.
+El proyecto implementa unicamente el tramo `Microservicio Spring Boot -> Analyzer ->
+Evidence/Metadata`. Detalle completo en `docs/03-Arquitectura.md`.
 
 ## Stack
 
 - **Lenguaje:** Python >= 3.11.
-- **Dependencias de runtime:** ninguna (solo libreria estandar).
+- **Dependencias de runtime:** `javalang` (parser AST de Java, motor principal del Analyzer desde
+  V0.2 — ver decision documentada en `docs/03-Arquitectura.md`).
 - **Dependencias de desarrollo:** `pytest` para testing.
 
 ## Estructura del proyecto
@@ -58,8 +72,8 @@ Skill-Documentation-AI/
 ├── docs/            Documentacion (arquitectura, skill, OpenAPI, LLM, analisis, seguridad, ...)
 ├── prompts/         Directrices de cada version del proyecto
 ├── skill/           Skill de documentacion (SKILL.md, rules/, references/, templates/)
-├── providers/       Interfaz de LLM Provider (sin implementaciones concretas en V0.1)
-├── analyzer/        Analyzer funcional para Java/Spring Boot
+├── providers/       Interfaz de LLM Provider (sin implementaciones concretas)
+├── analyzer/        Analyzer funcional para Java/Spring Boot (motor AST + fallback regex)
 ├── validators/       Placeholder, reservado para V0.4
 ├── generators/       Placeholder, reservado para V0.3
 ├── tests/           Tests unitarios del Analyzer
@@ -82,7 +96,7 @@ pip install -e ".[dev]"
 
 ## Ejecucion
 
-V0.1 no incluye una CLI (reservada para V0.6). El Analyzer se usa como libreria Python:
+No hay una CLI todavia (reservada para V0.6). El Analyzer se usa como libreria Python:
 
 ```python
 from analyzer import analyze_project
@@ -105,22 +119,26 @@ pytest
 
 El directorio `examples/customer-service/` contiene un microservicio Spring Boot minimo con
 varios tipos de endpoint (`GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `@PathVariable`,
-`@RequestParam`, `@RequestBody`) pensado para validar el Analyzer. Ver `examples/README.md`.
+`@RequestParam`, `@RequestBody`, `@RequestHeader`), DTOs con validaciones, DTOs anidados,
+colecciones, un enum, seguridad, `consumes`/`produces`, y un archivo que demuestra el motor de
+fallback (sintaxis Java invalida a proposito). Ver `examples/README.md`.
 
 ## Limitaciones
 
-- El Analyzer se basa en analisis de texto (regex + balance de brackets), no en un AST completo de
-  Java; ver limitaciones detalladas en `docs/07-Analisis.md`.
-- No hay generacion de OpenAPI, validacion, auditoria, CLI ni integracion con Confluence en esta
-  version.
-- No existen implementaciones concretas de proveedores LLM en esta version; solo la interfaz
-  (`providers/base.py`).
+- El motor AST (`javalang`) falla el archivo completo ante cualquier error de sintaxis, y no
+  soporta sintaxis Java posterior a 2020 (p. ej. `record`); en esos casos se usa el motor de
+  fallback (V0.1), con sus propias limitaciones conocidas. Ver `docs/07-Analisis.md`.
+- La resolucion de DTOs es por nombre simple de clase dentro del proyecto (sin resolucion de
+  `import`s/classpath); nombres ambiguos entre archivos no se resuelven (se registra un
+  diagnostic en vez de adivinar).
+- No hay generacion de OpenAPI, validacion, auditoria, CLI ni integracion con Confluence todavia.
+- No existen implementaciones concretas de proveedores LLM; solo la interfaz (`providers/base.py`).
 
 ## Roadmap
 
-Ver `docs/12-Roadmap.md`. Resumen: V0.2 Spring Boot Analyzer, V0.3 OpenAPI Generator, V0.4
-Validator + Auditor, V0.5 LLM Providers, V0.6 CLI, V0.7 Confluence Integration, V1.0 Production,
-V2.0 Documentation Quality Gate, V3.0 Drift Detection.
+Ver `docs/12-Roadmap.md`. Resumen: V0.3 OpenAPI Generator, V0.4 Validator + Auditor, V0.5 LLM
+Providers, V0.6 CLI, V0.7 Confluence Integration, V1.0 Production, V2.0 Documentation Quality
+Gate, V3.0 Drift Detection.
 
 ## Futuras integraciones
 

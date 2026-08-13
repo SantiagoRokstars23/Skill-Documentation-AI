@@ -1,8 +1,13 @@
 # 08 — Validacion
 
-> La validacion **no** esta implementada en V0.1 (reservada para V0.4, ver
-> `docs/12-Roadmap.md`). Este documento define el vocabulario y las bases conceptuales para esa
-> fase futura, tal como exige la directriz V0.1.
+> La validacion **no** esta implementada (reservada para V0.4, ver `docs/12-Roadmap.md`). Este
+> documento define el vocabulario y las bases conceptuales para esa fase futura.
+>
+> V0.2 introduce `DiagnosticSeverity` (`ERROR`/`WARNING`/`INFO`) a nivel del **Analyzer**
+> (`docs/09-Auditoria.md`), que ya usa exactamente esta clasificacion de tres niveles para sus
+> propios hallazgos (p. ej. `DTO_NAME_AMBIGUOUS` como WARNING). El futuro Validator podra
+> reutilizar el mismo tipo `Diagnostic`/`DiagnosticSeverity` en vez de definir uno paralelo,
+> aunque esa decision se toma cuando se implemente V0.4, no en V0.2.
 
 ## Validacion
 

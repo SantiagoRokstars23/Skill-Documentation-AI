@@ -5,8 +5,8 @@ completarse (criterios de aceptacion + Definition of Done) antes de iniciar la s
 
 | Version | Nombre | Estado |
 |---------|--------|--------|
-| V0.1 | Foundation & Architecture | **En progreso / esta version** |
-| V0.2 | Spring Boot Analyzer | Futuro |
+| V0.1 | Foundation & Architecture | Completada (`v0.1.0`) |
+| V0.2 | Spring Boot Analyzer (Advanced) | **Completada / esta version** |
 | V0.3 | OpenAPI Generator | Futuro |
 | V0.4 | Validator + Auditor | Futuro |
 | V0.5 | LLM Providers | Futuro |
@@ -20,8 +20,13 @@ completarse (criterios de aceptacion + Definition of Done) antes de iniciar la s
 
 - **V0.1 — Foundation & Architecture:** estructura del proyecto, documentacion inicial, Skill
   inicial, interfaz de LLM Provider, Analyzer inicial funcional. Ver `prompts/V0.1-foundation.md`.
-- **V0.2 — Spring Boot Analyzer:** profundizacion del Analyzer (mas anotaciones, mas robustez,
-  posiblemente resolucion de DTOs y herencia entre controllers).
+- **V0.2 — Spring Boot Analyzer (Advanced):** motor hibrido AST (`javalang`) + fallback regex de
+  V0.1; Controllers/Endpoints/Parameters ampliados (fully-qualified, package-private, multiples
+  `RequestMethod`, headers, consumes/produces, seguridad); resolucion de DTOs entre archivos
+  (campos, validaciones, anidamiento, colecciones, enums); `Response` (wrapper/body/status);
+  `Diagnostic` estructurado. Ver `prompts/V0.2-ADVANCED-SPRING-BOOT-ANALYZER.md` y
+  `docs/07-Analisis.md`. Herencia entre controllers **no** se resolvio (queda para una version
+  futura, ver limitaciones en `docs/07-Analisis.md`).
 - **V0.3 — OpenAPI Generator:** transformacion de la evidencia del Analyzer (mediada por la Skill
   y el LLM Provider) en especificaciones OpenAPI.
 - **V0.4 — Validator + Auditor:** validacion estructural/semantica de la especificacion generada y

@@ -1,5 +1,12 @@
 # 04 — Skill
 
+> V0.2 no modifica la Skill (no estaba en su Scope Lock). Se documenta aqui unicamente que la
+> evidencia que la Skill podra recibir en fases futuras es ahora considerablemente mas rica:
+> ademas de `Endpoint`/`Parameter`, el Analyzer produce `Controller`, `DTO`/`Field` (con
+> validaciones y anidamiento), `Response` y evidencia de seguridad (ver `docs/07-Analisis.md`).
+> Las reglas de `skill/rules/01-evidencia-e-incertidumbre.md` (nunca inventar, conservar la
+> incertidumbre) siguen aplicando sin cambios a esta evidencia ampliada.
+
 ## Que es la Skill
 
 La Skill de documentacion (`skill/`) es un conjunto estructurado de instrucciones, reglas y
