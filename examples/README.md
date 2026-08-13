@@ -28,11 +28,22 @@ pensado para compilarse ni ejecutarse) usado para validar el Analyzer.
 - `CustomerResponse`, `OrderResponse`: DTOs de respuesta, resueltos automaticamente a partir del
   tipo de retorno (`ResponseEntity<CustomerResponse>`, etc.).
 
+### OpenAPI (V0.3)
+
+`openapi.yaml` y `openapi.json` son artefactos de ejemplo generados por
+`generators.generate()` a partir de este mismo proyecto. Se regeneran manualmente cuando el
+ejemplo cambia; los tests (`tests/test_openapi_example_project.py`) validan hechos estructurales
+sobre una generacion fresca, no comparan estos archivos byte a byte. Ver `docs/05-OpenAPI.md`.
+
 Uso:
 
 ```python
 from analyzer import analyze_project
+from generators import generate, to_yaml, to_json
 
 result = analyze_project("examples/customer-service")
 print(result.to_json())
+
+document, diagnostics = generate(result)
+print(to_yaml(document))
 ```

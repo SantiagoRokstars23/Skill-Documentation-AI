@@ -54,9 +54,11 @@ Relacion conceptual entre componentes:
                       OpenAPI YAML/JSON
 ```
 
-**Importante:** esta arquitectura es conceptual para todo el proyecto. V0.1 implementa
-unicamente el **Analyzer** de forma funcional y deja el resto de componentes delimitados y
-documentados, pero no implementados (ver estado por componente mas abajo).
+**Importante:** esta arquitectura es conceptual para todo el proyecto. A la fecha (V0.3), estan
+implementados el **Analyzer** (V0.1, ampliado en V0.2) y el **OpenAPI Generator** (V0.3). El resto
+de componentes (Skill como motor ejecutable, LLM Provider concreto, Validator, Auditor, CLI,
+Integraciones) permanecen delimitados y documentados, pero no implementados (ver estado por
+componente mas abajo).
 
 ## Componentes
 
@@ -108,11 +110,31 @@ documentados, pero no implementados (ver estado por componente mas abajo).
 - **Estado en V0.1:** solo la interfaz conceptual (`providers/base.py`). Sin implementaciones
   concretas (fuera de alcance, ver Scope Lock).
 
-### OpenAPI Generator (no implementado en V0.1)
+### OpenAPI Generator (implementado en V0.3)
 
-- **Responsabilidad futura:** transformar la salida del LLM Provider (guiada por la Skill) en una
-  especificacion OpenAPI valida.
-- Reservado para V0.3. Ver `docs/05-OpenAPI.md`.
+- **Responsabilidad:** transformar `analyzer.AnalysisResult` en un documento OpenAPI 3.0.3
+  (`generators.generate`), y serializarlo a JSON/YAML (`generators.to_json`/`generators.to_yaml`).
+- **Entrada:** exclusivamente el modelo publico de `analyzer` (`AnalysisResult`, `Endpoint`,
+  `Parameter`, `Response`, `DTO`, `Field`, `Validation`, `Diagnostic`). No analiza Java.
+- **Salida:** `dict` (documento OpenAPI) + `list[Diagnostic]` propios del Generator.
+- **Dependencias externas:** `PyYAML` (unicamente para serializacion YAML). Ninguna dependencia
+  hacia `javalang` ni hacia los motores internos del Analyzer (`spring_boot_analyzer.py`,
+  `ast_analyzer.py`, `dto_analyzer.py`, `scanner.py` — prohibido explicitamente por el Scope Lock
+  de V0.3).
+- **Estructura interna:**
+  - `generators/openapi_types.py` — parseo del texto de tipo producido por el Analyzer, tabla de
+    tipos Java -> OpenAPI, mapeo de Bean Validation a keywords de schema.
+  - `generators/openapi_schemas.py` — construccion de `components.schemas` a partir de `DTO`,
+    con deduplicacion por nombre (`$ref`).
+  - `generators/openapi_generator.py` — orquestador: paths/operations/parameters/requestBody/
+    responses/security/operationId/orden deterministico/serializacion.
+  - `generators/__init__.py` — API publica (`generate`, `to_json`, `to_yaml`, `OPENAPI_VERSION`).
+- Detalle completo (incluidas las politicas conservadoras de responses/security/tipos no
+  resueltos) en `docs/05-OpenAPI.md`.
+- **No modifico ningun archivo de `analyzer/`** durante su implementacion (ver decision 8 mas
+  abajo): la Regla de la seccion 6 de `prompts/V0.3-OPENAPI-GENERATOR.md` exigia demostrar que
+  cada dato faltante era realmente necesario antes de tocar el modelo del Analyzer, y en ningun
+  caso lo fue.
 
 ### Validator (no implementado en V0.1)
 
@@ -161,11 +183,18 @@ analyzer.ast_analyzer            |
         +-----------+-----------+
                     v
    analyzer.models.AnalysisResult   (metadata estructurada, serializable)
+        |
+        v
+   generators.generate(result)      (V0.3 — OpenAPI Generator)
+        |
+        v
+   documento OpenAPI (dict) -> generators.to_json / generators.to_yaml
 ```
 
-El resultado del Analyzer es la unica salida funcional de V0.1/V0.2 y esta disenado para ser
-consumido por el futuro OpenAPI Generator sin necesidad de romper compatibilidad (ver
-`docs/07-Analisis.md` y `docs/13-Versionado.md`).
+El resultado del Analyzer fue diseñado en V0.1/V0.2 para ser consumido por un futuro OpenAPI
+Generator sin necesidad de romper compatibilidad (ver `docs/07-Analisis.md` y
+`docs/13-Versionado.md`); V0.3 confirma esa expectativa: no fue necesario modificar ningun campo
+de `analyzer/models.py` para implementar el Generator.
 
 ## Limites entre componentes
 
@@ -179,6 +208,12 @@ consumido por el futuro OpenAPI Generator sin necesidad de romper compatibilidad
   utilidades (texto, dicts, nodos ya normalizados via `annotation_args`/`literal_text`/
   `type_to_text`), salvo por el recorrido directo del arbol (`javalang.tree.*` para isinstance),
   que se acepta como acoplamiento controlado (ver decision 5 mas abajo).
+- (V0.3) El Generator (`generators/`) **no** importa `javalang`, `analyzer.spring_boot_analyzer`,
+  `analyzer.ast_analyzer`, `analyzer.dto_analyzer` ni `analyzer.scanner` — solo el modelo publico
+  de `analyzer` (verificado por grep sobre `generators/*.py`, ver reporte de revision de V0.3).
+  Este limite es la contraparte, del lado del Generator, del limite ya existente "el Analyzer no
+  conoce la Skill/LLM/OpenAPI": ninguno de los dos componentes conoce los detalles internos del
+  otro, solo la estructura de datos que los conecta (`AnalysisResult`).
 
 ## Decisiones arquitectonicas relevantes
 
@@ -238,5 +273,21 @@ consumido por el futuro OpenAPI Generator sin necesidad de romper compatibilidad
    concretas, para evitar acoplamiento a un LLM especifico y cumplir el Scope Lock. Sin cambios
    en V0.2 (seccion 15 de la directriz V0.2 lo reitera explicitamente).
 
-7. **`validators/` y `generators/` se mantienen vacios/placeholder**: su logica pertenece a
-   V0.3/V0.4, y V0.2 tiene explicitamente prohibido implementar OpenAPI (Scope Lock V0.2).
+7. **`validators/` se mantiene vacio/placeholder**: su logica pertenece a V0.4. `generators/` dejo
+   de ser placeholder en V0.3 (ver punto 8).
+
+8. **V0.3 — OpenAPI 3.0.3, sin modificar el Analyzer.** Antes de implementar, se aplico
+   sistematicamente el proceso obligatorio de la seccion 6 de
+   `prompts/V0.3-OPENAPI-GENERATOR.md` (identificar dato faltante -> verificar si ya existe en el
+   modelo -> determinar si puede obtenerse sin modificar el Analyzer -> solo entonces proponer
+   ampliacion) para cada necesidad de OpenAPI (operationId, codigo de status numerico, tags,
+   mapeo de tipos). En todos los casos la informacion pudo derivarse en el Generator a partir de
+   campos ya existentes (`java_method`, `controller`, `method`, `endpoint`, el texto de
+   `Response.status`, el texto de `Parameter.type`/`Field.type`/`Response.body_type`) mas tablas
+   de conversion propias del Generator (nombres `HttpStatus` -> codigo, tipo Java -> tipo
+   OpenAPI). **No se modifico `analyzer/models.py` ni ningun otro archivo de `analyzer/`.**
+   Version elegida: **OpenAPI 3.0.3** (no 3.1.x, revirtiendo la aspiracion escrita en V0.1) por
+   mayor compatibilidad de herramientas y schemas mas simples de construir a mano sin una
+   libreria de validacion. Dependencia nueva: `PyYAML` (MIT, solo para serializacion YAML; JSON
+   usa la libreria estandar). Ver `docs/05-OpenAPI.md` para el detalle completo de las politicas
+   conservadoras (responses sin status, security sin scheme concreto, tipos no resueltos).

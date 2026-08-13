@@ -1,8 +1,9 @@
 # Skill-Documentation-AI
 
 Motor de documentacion inteligente para microservicios Java/Spring Boot. Analiza codigo fuente,
-extrae evidencia estructurada de su API y (en fases futuras) utiliza una Skill especializada junto
-con un LLM intercambiable para generar, completar, actualizar y auditar especificaciones OpenAPI.
+extrae evidencia estructurada de su API, y genera una especificacion **OpenAPI 3.0.3**. En fases
+futuras utilizara ademas una Skill especializada junto con un LLM intercambiable para completar,
+actualizar y auditar esa documentacion.
 
 ## Problema
 
@@ -16,11 +17,11 @@ Reducir ese problema mediante automatizacion, analisis estatico deterministico d
 capacidades de LLM controladas por una Skill especializada, manteniendo el sistema independiente
 de cualquier proveedor de LLM concreto. Ver `docs/02-Objetivos.md`.
 
-## Estado actual — V0.2 (Advanced Spring Boot Analyzer)
+## Estado actual — V0.3 (OpenAPI Generator)
 
-**Lo unico funcional del proyecto es el Analyzer.** El resto de componentes (Skill, LLM Provider,
-OpenAPI Generator, Validator, Auditor, CLI, integraciones) estan definidos y documentados, pero no
-implementados. Ver `docs/12-Roadmap.md`.
+**Funcional: el Analyzer y el OpenAPI Generator.** El resto de componentes (Skill como motor
+ejecutable, LLM Provider concreto, Validator, Auditor, CLI, integraciones) estan definidos y
+documentados, pero no implementados. Ver `docs/12-Roadmap.md`.
 
 Funcionalidad disponible hoy:
 
@@ -37,11 +38,15 @@ Funcionalidad disponible hoy:
   etc.) sobre campos y parametros.
 - Analisis de **respuesta** (`ResponseEntity<T>`, colecciones, `@ResponseStatus`), de
   `consumes`/`produces`, y evidencia de **seguridad** (`@PreAuthorize`, `@Secured`).
-- Generacion de metadata estructurada y serializable (JSON) de endpoints, controllers, DTOs y
-  diagnostics.
-- El Analyzer **nunca inventa informacion**: cuando un dato no puede determinarse con confianza
-  (p. ej. un nombre de DTO ambiguo entre archivos), se registra un `Diagnostic` en vez de
-  suponerse (ver `docs/09-Auditoria.md`).
+- **Generacion de una especificacion OpenAPI 3.0.3** (`generators.generate`) a partir de la
+  metadata del Analyzer: paths, operations, parameters, requestBody, responses, `components.schemas`
+  con `$ref` reutilizado, mapeo de Bean Validation, `operationId` deterministico, y politicas
+  conservadoras documentadas cuando falta evidencia (nunca `200 application/json` por defecto). Ver
+  `docs/05-OpenAPI.md`.
+- Serializacion a JSON (libreria estandar) y YAML (`PyYAML`).
+- Ni el Analyzer ni el Generator inventan informacion: cuando un dato no puede determinarse con
+  confianza (p. ej. un nombre de DTO ambiguo, un endpoint sin evidencia de codigo de respuesta), se
+  registra un `Diagnostic` en vez de suponerse (ver `docs/09-Auditoria.md`).
 
 ## Arquitectura (resumen)
 
@@ -50,14 +55,17 @@ Microservicio Spring Boot -> Analyzer -> Evidence/Metadata -> Skill -> LLM Provi
     -> OpenAPI Generator -> Validator -> Auditor -> OpenAPI
 ```
 
-El proyecto implementa unicamente el tramo `Microservicio Spring Boot -> Analyzer ->
-Evidence/Metadata`. Detalle completo en `docs/03-Arquitectura.md`.
+El proyecto implementa los tramos `Microservicio Spring Boot -> Analyzer -> Evidence/Metadata` y
+`Evidence/Metadata -> OpenAPI Generator -> OpenAPI` (esta ultima transformacion no pasa todavia por
+la Skill ni por un LLM Provider, que no tienen implementacion concreta). Detalle completo en
+`docs/03-Arquitectura.md`.
 
 ## Stack
 
 - **Lenguaje:** Python >= 3.11.
 - **Dependencias de runtime:** `javalang` (parser AST de Java, motor principal del Analyzer desde
-  V0.2 — ver decision documentada en `docs/03-Arquitectura.md`).
+  V0.2) y `PyYAML` (serializacion YAML del OpenAPI Generator, V0.3) — ver decisiones documentadas
+  en `docs/03-Arquitectura.md`.
 - **Dependencias de desarrollo:** `pytest` para testing.
 
 ## Estructura del proyecto
@@ -75,9 +83,9 @@ Skill-Documentation-AI/
 ├── providers/       Interfaz de LLM Provider (sin implementaciones concretas)
 ├── analyzer/        Analyzer funcional para Java/Spring Boot (motor AST + fallback regex)
 ├── validators/       Placeholder, reservado para V0.4
-├── generators/       Placeholder, reservado para V0.3
-├── tests/           Tests unitarios del Analyzer
-└── examples/        Microservicio Spring Boot de ejemplo
+├── generators/       OpenAPI Generator funcional (AnalysisResult -> OpenAPI 3.0.3)
+├── tests/           Tests del Analyzer y del OpenAPI Generator
+└── examples/        Microservicio Spring Boot de ejemplo (+ openapi.yaml/openapi.json generados)
 ```
 
 ## Instalacion
@@ -96,10 +104,12 @@ pip install -e ".[dev]"
 
 ## Ejecucion
 
-No hay una CLI todavia (reservada para V0.6). El Analyzer se usa como libreria Python:
+No hay una CLI todavia (reservada para V0.6). El Analyzer y el Generator se usan como libreria
+Python:
 
 ```python
 from analyzer import analyze_project
+from generators import generate, to_yaml, to_json
 
 result = analyze_project("examples/customer-service")
 
@@ -107,6 +117,11 @@ for endpoint in result.endpoints:
     print(endpoint.method, endpoint.endpoint, "->", endpoint.controller)
 
 print(result.to_json())
+
+document, diagnostics = generate(result)
+print(to_yaml(document))
+for diagnostic in diagnostics:
+    print(diagnostic.severity.value, diagnostic.code, diagnostic.message)
 ```
 
 ## Ejecucion de tests
@@ -131,14 +146,21 @@ fallback (sintaxis Java invalida a proposito). Ver `examples/README.md`.
 - La resolucion de DTOs es por nombre simple de clase dentro del proyecto (sin resolucion de
   `import`s/classpath); nombres ambiguos entre archivos no se resuelven (se registra un
   diagnostic en vez de adivinar).
-- No hay generacion de OpenAPI, validacion, auditoria, CLI ni integracion con Confluence todavia.
+- El Generator nunca asume un codigo de respuesta (`200`, etc.) sin evidencia de `@ResponseStatus`;
+  cuando falta, usa la clave `"default"` y registra un `Diagnostic` — esto ocurrira con frecuencia
+  en proyectos reales, ya que la mayoria de los endpoints Spring no declaran `@ResponseStatus`
+  explicitamente. Ver `docs/05-OpenAPI.md`.
+- La evidencia de seguridad (`@PreAuthorize`/`@Secured`) no se traduce a un `securityScheme` de
+  OpenAPI (no hay evidencia suficiente para elegir uno); se documenta como extension
+  `x-security-evidence`.
+- `Map<K,V>` se representa como `type: object` generico, sin `additionalProperties` tipado.
+- No hay validacion de OpenAPI, auditoria, CLI ni integracion con Confluence todavia.
 - No existen implementaciones concretas de proveedores LLM; solo la interfaz (`providers/base.py`).
 
 ## Roadmap
 
-Ver `docs/12-Roadmap.md`. Resumen: V0.3 OpenAPI Generator, V0.4 Validator + Auditor, V0.5 LLM
-Providers, V0.6 CLI, V0.7 Confluence Integration, V1.0 Production, V2.0 Documentation Quality
-Gate, V3.0 Drift Detection.
+Ver `docs/12-Roadmap.md`. Resumen: V0.4 Validator + Auditor, V0.5 LLM Providers, V0.6 CLI, V0.7
+Confluence Integration, V1.0 Production, V2.0 Documentation Quality Gate, V3.0 Drift Detection.
 
 ## Futuras integraciones
 

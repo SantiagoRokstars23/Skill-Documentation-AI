@@ -40,6 +40,14 @@ unica y limites claros; ningun componente superior debe acoplarse a un proveedor
    encontro. Ejemplos ya implementados: un nombre de DTO ambiguo entre archivos no se resuelve al
    azar (`docs/07-Analisis.md`); un mapping sin metodo HTTP resoluble se omite en vez de asumir
    uno por defecto.
+7. **(V0.3) La misma regla de evidencia aplica al Generator, no solo al Analyzer.** El OpenAPI
+   Generator no asume `200 application/json` sin evidencia de `@ResponseStatus`, no traduce
+   evidencia de seguridad (`@PreAuthorize`/`@Secured`) a un `securityScheme` concreto que no puede
+   justificar, y no inventa un schema para un tipo no resuelto (`{}` + `Diagnostic` en vez de
+   adivinar). Cuando una convencion propia del Generator es inevitable por requisitos
+   estructurales del formato de salida (p. ej. `info.title`/`info.version`, obligatorios en
+   OpenAPI, sin fuente de evidencia posible), debe quedar explicitamente documentada como
+   convencion, nunca presentada como si viniera del codigo analizado. Ver `docs/05-OpenAPI.md`.
 
 ## Reglas de desarrollo
 
@@ -56,8 +64,19 @@ las versiones del proyecto, no solo a V0.1.
 - El Analyzer no depende de la Skill, el LLM Provider, ni de OpenAPI.
 - La Skill no depende de un LLM concreto ni contiene instrucciones exclusivas de una herramienta.
 - Toda interaccion con un LLM pasa por la interfaz `LLMProvider` (`providers/base.py`).
-- `validators/` y `generators/` permanecen como paquetes placeholder hasta que su version
-  correspondiente (V0.4 y V0.3) los implemente.
+- `validators/` permanece como paquete placeholder hasta que V0.4 lo implemente. `generators/`
+  dejo de ser placeholder en V0.3 (OpenAPI Generator).
+- (V0.3) El Generator (`generators/`) no importa `javalang` ni ningun motor interno del Analyzer
+  (`spring_boot_analyzer.py`, `ast_analyzer.py`, `dto_analyzer.py`, `scanner.py`): solo el modelo
+  publico de `analyzer`. Analyzer y Generator son responsabilidades separadas (`Java -> Metadata`
+  vs. `Metadata -> OpenAPI`) y no deben mezclarse (ver `docs/03-Arquitectura.md`).
+- (V0.3) **Antes de modificar `analyzer/models.py` para dar soporte a un componente rio abajo**
+  (Generator, Validator, Auditor), debe demostrarse que el dato faltante no puede derivarse del
+  modelo existente: identificar la informacion requerida, verificar si ya existe en
+  `AnalysisResult`/`Endpoint`/`Parameter`/`DTO`/`Field`/`Response`, y solo si genuinamente no
+  puede obtenerse sin modificar el Analyzer, proponer la ampliacion (proceso obligatorio usado en
+  V0.3, seccion 6 de `prompts/V0.3-OPENAPI-GENERATOR.md` — se mantiene como patron para futuras
+  versiones). No agregar campos "por si acaso" ni entidades por simetria.
 - (V0.2) Cualquier dependencia de terceros que el Analyzer necesite para parsear/interpretar
   codigo debe aislarse detras de un modulo propio (patron establecido por
   `analyzer/ast_backend.py` para `javalang`): el resto del Analyzer no debe importar el paquete
@@ -88,6 +107,16 @@ como fuente unica de verdad cuando exista informacion deterministica disponible.
 - Los tests deben ser reproducibles (`pytest`, sin dependencias externas de red o entorno). Los
   tests que ejercitan directamente el motor de fallback importan `spring_boot_analyzer` o pasan
   codigo Java deliberadamente invalido para forzar esa ruta.
+- (V0.3) El Generator debe tener tests para: cada metodo HTTP, cada origen de parametro
+  (path/query/header) con required/optional/defaultValue, request body (primitivo/DTO/coleccion/
+  DTO anidado), responses (con y sin evidencia de status, DTO, primitivo, coleccion, ausencia
+  total de `Response`), schemas (DTO simple/anidado/enum/coleccion/repetido con `$ref`),
+  validaciones Bean Validation (una por anotacion soportada), consumes/produces (clase, metodo,
+  combinacion, ausencia), security, diagnostics, colisiones de `operationId`, y serializacion
+  JSON/YAML valida y deterministica (seccion 10 de `prompts/V0.3-OPENAPI-GENERATOR.md`).
+- (V0.3) Golden files limitados: se permite regenerar y validar hechos estructurales sobre
+  `examples/customer-service` (paths/operaciones/schemas/algunos `$ref` presentes), pero **no**
+  comparar archivos generados byte a byte (fragil ante cambios de formato intencionales).
 
 ## Reglas de documentacion
 

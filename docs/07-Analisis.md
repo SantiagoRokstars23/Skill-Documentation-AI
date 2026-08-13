@@ -6,6 +6,12 @@ El Analyzer (`analyzer/`) realiza analisis **estatico** y **deterministico** del
 un microservicio Java/Spring Boot para producir evidencia estructurada sobre su API. No utiliza
 ningun LLM: toda la informacion que produce proviene directamente del codigo fuente.
 
+**Consumidor (V0.3):** `AnalysisResult` es consumido por el OpenAPI Generator
+(`generators/`, ver `docs/05-OpenAPI.md`) para producir una especificacion OpenAPI 3.0.3. El
+Generator no forma parte de este documento ni de este paquete: consume `analyzer` como una
+libreria externa, a traves de su modelo publico unicamente. Ningun archivo de `analyzer/` se
+modifico para implementar V0.3.
+
 **Principio fundamental (V0.2):** el Analyzer produce **evidencia, no inferencias**. Cuando un
 dato no puede determinarse de forma suficientemente confiable a partir del codigo analizado,
 queda como desconocido (`None`/vacio) y, cuando corresponde, se registra un `Diagnostic`

@@ -1,0 +1,396 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Generated API",
+    "version": "0.0.0"
+  },
+  "paths": {
+    "/api/customers": {
+      "get": {
+        "operationId": "getCustomerControllerListCustomers",
+        "tags": [
+          "CustomerController"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 20
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Respuesta generada automaticamente (sin descripcion disponible en la evidencia).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerResponse"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postCustomerControllerCreateCustomer",
+        "tags": [
+          "CustomerController"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "Respuesta generada automaticamente (sin descripcion disponible en la evidencia).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/customers/{id}": {
+      "delete": {
+        "operationId": "deleteCustomerControllerDeleteCustomer",
+        "tags": [
+          "CustomerController"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Respuesta generada automaticamente (sin descripcion disponible en la evidencia)."
+          }
+        }
+      },
+      "get": {
+        "operationId": "getCustomerControllerGetCustomer",
+        "tags": [
+          "CustomerController"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Respuesta generada automaticamente (sin descripcion disponible en la evidencia).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "putCustomerControllerUpdateCustomer",
+        "tags": [
+          "CustomerController"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "Respuesta generada automaticamente (sin descripcion disponible en la evidencia).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/customers/{id}/notes": {
+      "post": {
+        "operationId": "postCustomerControllerAddNote",
+        "tags": [
+          "CustomerController"
+        ],
+        "parameters": [
+          {
+            "name": "X-Request-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Respuesta generada automaticamente (sin descripcion disponible en la evidencia)."
+          }
+        },
+        "x-security-evidence": [
+          "PreAuthorize(hasRole('ADMIN'))"
+        ]
+      }
+    },
+    "/api/customers/{id}/status": {
+      "patch": {
+        "operationId": "patchCustomerControllerUpdateStatus",
+        "tags": [
+          "CustomerController"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CustomerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "default": {
+            "description": "Respuesta generada automaticamente (sin descripcion disponible en la evidencia).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/orders/{orderId}": {
+      "get": {
+        "operationId": "getOrderControllerGetOrder",
+        "tags": [
+          "OrderController"
+        ],
+        "parameters": [
+          {
+            "name": "orderId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "default": {
+            "description": "Respuesta generada automaticamente (sin descripcion disponible en la evidencia).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/reports/summary": {
+      "get": {
+        "operationId": "getReportsSummary",
+        "tags": [
+          "LegacyReportController"
+        ],
+        "responses": {
+          "default": {
+            "description": "Respuesta generada automaticamente (sin descripcion disponible en la evidencia)."
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Address": {
+        "type": "object",
+        "properties": {
+          "city": {
+            "type": "string",
+            "minLength": 1
+          },
+          "postalCode": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "city"
+        ]
+      },
+      "CustomerRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CustomerStatus"
+          },
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "CustomerResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "CustomerStatus": {
+        "type": "string",
+        "enum": [
+          "ACTIVE",
+          "INACTIVE",
+          "SUSPENDED"
+        ]
+      },
+      "OrderResponse": {
+        "type": "object",
+        "properties": {
+          "orderId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

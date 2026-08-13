@@ -50,3 +50,15 @@ claves de las que existian en V0.1. Esto es intencional: es precisamente la func
 debia agregar (seccion 5 de `prompts/V0.2-ADVANCED-SPRING-BOOT-ANALYZER.md`). Los dos tests de
 V0.1 que hacian esa comparacion exacta (`tests/test_models.py`) se actualizaron para reflejar la
 forma completa, sin reducir lo que verifican.
+
+### V0.2.0 -> V0.3.0
+
+**Sin cambios en `analyzer/`.** V0.3 (OpenAPI Generator) no modifico ningun archivo del paquete
+`analyzer/`: ni `models.py`, ni `__init__.py`, ni los motores internos. El proceso obligatorio de
+la seccion 6 de `prompts/V0.3-OPENAPI-GENERATOR.md` se aplico a cada necesidad de datos de OpenAPI
+y en ningun caso se demostro necesaria una ampliacion del modelo del Analyzer (ver
+`docs/03-Arquitectura.md`, decision 8). Los 84 tests de V0.2 permanecen sin modificar.
+
+Se agrega el paquete `generators/` con implementacion real (antes placeholder) y una dependencia
+de runtime nueva: `PyYAML>=6.0,<7.0` (MIT, usada exclusivamente para serializacion YAML). No se
+agrego ninguna libreria de validacion ni especifica de OpenAPI (Scope Lock V0.3).

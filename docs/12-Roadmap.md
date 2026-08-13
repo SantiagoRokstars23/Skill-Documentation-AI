@@ -6,8 +6,8 @@ completarse (criterios de aceptacion + Definition of Done) antes de iniciar la s
 | Version | Nombre | Estado |
 |---------|--------|--------|
 | V0.1 | Foundation & Architecture | Completada (`v0.1.0`) |
-| V0.2 | Spring Boot Analyzer (Advanced) | **Completada / esta version** |
-| V0.3 | OpenAPI Generator | Futuro |
+| V0.2 | Spring Boot Analyzer (Advanced) | Completada (`v0.2.0`) |
+| V0.3 | OpenAPI Generator | **Completada / esta version** |
 | V0.4 | Validator + Auditor | Futuro |
 | V0.5 | LLM Providers | Futuro |
 | V0.6 | CLI | Futuro |
@@ -27,8 +27,12 @@ completarse (criterios de aceptacion + Definition of Done) antes de iniciar la s
   `Diagnostic` estructurado. Ver `prompts/V0.2-ADVANCED-SPRING-BOOT-ANALYZER.md` y
   `docs/07-Analisis.md`. Herencia entre controllers **no** se resolvio (queda para una version
   futura, ver limitaciones en `docs/07-Analisis.md`).
-- **V0.3 — OpenAPI Generator:** transformacion de la evidencia del Analyzer (mediada por la Skill
-  y el LLM Provider) en especificaciones OpenAPI.
+- **V0.3 — OpenAPI Generator:** transformacion de `analyzer.AnalysisResult` en un documento
+  OpenAPI 3.0.3 (`generators.generate`), con politicas conservadoras documentadas para responses
+  sin evidencia de status, tipos no resueltos, y evidencia de seguridad sin scheme concreto. Sin
+  modificaciones al Analyzer. Ver `prompts/V0.3-OPENAPI-GENERATOR.md` y `docs/05-OpenAPI.md`. La
+  transformacion **no** pasa por la Skill ni por un LLM Provider (ninguno de los dos existe
+  todavia como implementacion): consume directamente la metadata del Analyzer.
 - **V0.4 — Validator + Auditor:** validacion estructural/semantica de la especificacion generada y
   auditoria de trazabilidad/confidence.
 - **V0.5 — LLM Providers:** implementaciones concretas de la interfaz `LLMProvider` (Claude,

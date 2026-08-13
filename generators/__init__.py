@@ -1,6 +1,23 @@
-"""Paquete reservado para el OpenAPI Generator (docs/05-OpenAPI.md).
+"""OpenAPI Generator (V0.3): transforma ``analyzer.AnalysisResult`` en un documento
+OpenAPI 3.0.3.
 
-Sin implementacion en V0.1. El Generator es objeto de V0.3 (ver docs/12-Roadmap.md).
-Este paquete existe unicamente para reflejar la estructura de proyecto definida en
-prompts/V0.1-foundation.md seccion 8.
+Ver docs/05-OpenAPI.md para el contrato y las decisiones documentadas, y
+docs/07-Analisis.md para el origen de la metadata consumida. El Generator consume
+exclusivamente el modelo publico de ``analyzer``; no analiza Java ni depende de los
+motores internos del Analyzer (ver `docs/03-Arquitectura.md`).
+
+Uso:
+
+    from analyzer import analyze_project
+    from generators import generate, to_json, to_yaml
+
+    result = analyze_project("examples/customer-service")
+    document, diagnostics = generate(result)
+    print(to_yaml(document))
 """
+
+from __future__ import annotations
+
+from .openapi_generator import OPENAPI_VERSION, generate, to_json, to_yaml
+
+__all__ = ["OPENAPI_VERSION", "generate", "to_json", "to_yaml"]

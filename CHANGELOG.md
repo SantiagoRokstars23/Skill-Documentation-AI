@@ -5,6 +5,31 @@ Todos los cambios relevantes de este proyecto se documentan en este archivo.
 El formato sigue las convenciones de [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y este proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 
+## [0.3.0] - 2026-08-13
+
+### Added
+
+- OpenAPI Generator (`generators/`): transforma `analyzer.AnalysisResult` en un documento OpenAPI **3.0.3** (`generators.generate`), sin modificar ni depender de los motores internos del Analyzer.
+- `generators/openapi_types.py`: parser del texto de tipo producido por el Analyzer (`ParsedType`/`parse_type_text`), tabla de tipos Java → OpenAPI (`PRIMITIVE_TYPES`), mapeo de Bean Validation (`@NotNull`/`@NotBlank`/`@NotEmpty`/`@Size`/`@Min`/`@Max`/`@Positive`/`@PositiveOrZero`/`@Negative`/`@NegativeOrZero`/`@Email`/`@Pattern`) a keywords de schema.
+- `generators/openapi_schemas.py`: construcción de `components.schemas` a partir de `DTO`, con deduplicación por nombre y reutilización de `$ref` (sin lógica propia de detección de ciclos: el árbol de DTOs que entrega el Analyzer ya es acíclico).
+- `generators/openapi_generator.py`: paths/operations/parameters/requestBody/responses/security/consumes-produces, estrategia determinista de `operationId` (con resolución de colisiones por sufijo numérico, nunca hashes), orden explícito de `paths`/schemas/parameters para generación determinista, serialización `to_json`/`to_yaml`.
+- Política conservadora de `responses`: nunca asume `200 application/json` sin evidencia; usa la clave `"default"` cuando no hay `@ResponseStatus` reconocible o no hay `Response` en absoluto (endpoints del motor de fallback), siempre acompañado de un `Diagnostic`.
+- Política conservadora de `security`: la evidencia de `@PreAuthorize`/`@Secured` se documenta como extensión `x-security-evidence` (nunca como un `securityScheme` inventado), con `Diagnostic`.
+- Tipos no resueltos (no primitivos, sin DTO resoluble) generan `schema: {}` + `Diagnostic` (`OPENAPI_UNKNOWN_TYPE`), nunca una estructura supuesta. `Map<K,V>` se representa como `type: object` genérico sin `additionalProperties` tipado.
+- Artefactos de ejemplo `examples/customer-service/openapi.yaml` y `openapi.json`, generados a partir del proyecto de ejemplo.
+- 65 tests nuevos (84 → 149), organizados por capacidad (tipos, schemas, paths, parameters, request body, responses, consumes/produces, security, operationId con colisiones, serialización, golden-files limitados sobre el proyecto de ejemplo).
+
+### Changed
+
+- `pyproject.toml`: versión `0.2.0` → `0.3.0`; se agrega la dependencia de runtime `PyYAML>=6.0,<7.0` (MIT, usada exclusivamente para serialización YAML).
+- `docs/05-OpenAPI.md`: reescrito para describir el comportamiento real implementado (antes era puramente aspiracional). Versión objetivo fijada en OpenAPI 3.0.3 (revirtiendo la aspiración de 3.1.x escrita en V0.1).
+- `generators/__init__.py`: deja de ser un placeholder y expone la API pública del Generator.
+
+### Scope
+
+- No se implementó Swagger UI/Editor, un validador OpenAPI completo, generación de código cliente/servidor/SDK, documentación HTML, UI, CLI, CI/CD, Docker, Confluence, ni ningún proveedor LLM. Ver `docs/12-Roadmap.md`.
+- `analyzer/` no se modificó: `models.py`, `__init__.py`, `ast_analyzer.py`, `ast_backend.py`, `dto_analyzer.py` y `spring_boot_analyzer.py` quedaron intactos; los 84 tests de V0.2 no se modificaron y continúan pasando.
+
 ## [0.2.0] - 2026-08-13
 
 ### Added
