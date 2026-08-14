@@ -17,15 +17,17 @@ Reducir ese problema mediante automatizacion, analisis estatico deterministico d
 capacidades de LLM controladas por una Skill especializada, manteniendo el sistema independiente
 de cualquier proveedor de LLM concreto. Ver `docs/02-Objetivos.md`.
 
-## Estado actual — V0.7 (LLM Real Provider & AI Foundation)
+## Estado actual — V0.8 (AI Documentation Foundation)
 
 **Funcional: el Analyzer, el OpenAPI Generator, el OpenAPI Quality Validator, la CLI
-(`spring-doc`) y la infraestructura de LLM Providers** (configuracion, errores, seleccion por
-nombre, `FakeProvider` determinista, y desde V0.7 un primer provider real, `AnthropicProvider`,
-via stdlib sin SDK — **sin integracion todavia con ningun consumidor real** (Analyzer/Generator/
-Validator/CLI/Skill), eso es V0.8). El resto de componentes (Skill como motor ejecutable, Auditor,
-integraciones) estan definidos y
-documentados, pero no implementados. Ver `docs/12-Roadmap.md`.
+(`spring-doc`), la infraestructura de LLM Providers** (configuracion, errores, seleccion por
+nombre, `FakeProvider` determinista, `AnthropicProvider` real via stdlib sin SDK) **y la capa AI**
+(`ai/`, V0.8: primer consumidor real de `LLMProvider` — `DocumentationContextBuilder` +
+`DocumentationPromptBuilder` + `DocumentationEngine`, generando documentacion tecnica basada
+exclusivamente en la evidencia del Analyzer). **Sin integracion todavia con la CLI** (no hay
+comandos nuevos) **ni con Analyzer/Generator/Validator/Skill** (ninguno fue modificado ni depende
+de `ai/`). El resto de componentes (Skill como motor ejecutable, Auditor, integraciones) estan
+definidos y documentados, pero no implementados. Ver `docs/12-Roadmap.md`.
 
 Funcionalidad disponible hoy:
 
@@ -106,7 +108,9 @@ Skill-Documentation-AI/
 ├── generators/       OpenAPI Generator funcional (AnalysisResult -> OpenAPI 3.0.3)
 ├── validator/        OpenAPI Quality Validator funcional (documento OpenAPI -> Diagnostics)
 ├── cli/             CLI funcional (`spring-doc`): analyze / generate / validate
-├── tests/           Tests del Analyzer, del Generator, del Validator, de la CLI y de providers/
+├── ai/              Capa AI (V0.8): DocumentationContextBuilder / PromptBuilder / Engine --
+│                    primer consumidor real de providers.LLMProvider, sin integrar con CLI/Skill
+├── tests/           Tests del Analyzer, del Generator, del Validator, de la CLI, de providers/ y de ai/
 └── examples/        Microservicio Spring Boot de ejemplo (+ openapi.yaml/openapi.json generados)
 ```
 
@@ -190,6 +194,33 @@ for diagnostic in validate(document):
     print(diagnostic.severity.value, diagnostic.code, diagnostic.message)
 ```
 
+## Capa AI (`ai/`, V0.8)
+
+Genera documentacion tecnica con un LLM a partir de un `AnalysisResult`, sin invocar la CLI ni
+modificar el Generator/Validator. Se usa programaticamente, inyectando el provider por
+constructor:
+
+```python
+from analyzer import analyze_project
+from providers import FakeProvider  # o get_provider(ProviderConfig(...)) para AnthropicProvider
+from ai import DocumentationContextBuilder, DocumentationPromptBuilder, DocumentationEngine
+
+result = analyze_project("examples/customer-service")
+
+engine = DocumentationEngine(
+    provider=FakeProvider(response='{"project_description": "..."}'),  # o AnthropicProvider real
+    context_builder=DocumentationContextBuilder(),
+    prompt_builder=DocumentationPromptBuilder(),
+)
+documentation = engine.generate(result)
+print(documentation.to_json())
+```
+
+Cambiar `FakeProvider` por un `AnthropicProvider` real (via `providers.get_provider`) no requiere
+modificar `ai/` en absoluto -- es exactamente el punto de depender solo de la abstraccion
+`LLMProvider`. No existe todavia un comando de CLI para esto (`spring-doc ai`/similares no
+existen); la integracion queda para una version futura.
+
 ## Skill de documentacion para LLMs (`skills/spring-doc/SKILL.md`)
 
 `skills/spring-doc/SKILL.md` es un documento de conocimiento independiente — LLM-agnostico,
@@ -241,10 +272,15 @@ fallback (sintaxis Java invalida a proposito). Ver `examples/README.md`.
   ERROR pero un volumen considerable de WARNING/INFO (sin `description` en ningun lado, sin
   `security` real) — comportamiento esperado, no un indicio de error. Ver `docs/05-OpenAPI.md`.
 - No hay auditoria ni integracion con Confluence todavia.
-- `providers/` tiene la interfaz (V0.1), la infraestructura completa (V0.6) y un primer provider
-  real, `AnthropicProvider` (V0.7, via stdlib, sin SDK) — pero **ningun consumidor real lo usa
-  todavia**: ningun comando de la CLI (`analyze`/`generate`/`validate`) usa `providers/` en
-  absoluto, no hace falta configurar nada de esto para usar `spring-doc`. Esa integracion es V0.8.
+- `providers/` tiene la interfaz (V0.1), la infraestructura completa (V0.6) y un provider real,
+  `AnthropicProvider` (V0.7, via stdlib, sin SDK). Ningun comando de la CLI (`analyze`/`generate`/
+  `validate`) usa `providers/` ni `ai/`: no hace falta configurar nada de esto para usar
+  `spring-doc`.
+- `ai/` (V0.8) genera documentacion usando `LLMProvider` (real o `FakeProvider`), pero **no esta
+  integrado con ningun otro componente todavia**: se usa programaticamente
+  (`DocumentationEngine(provider, context_builder, prompt_builder).generate(analysis_result)`),
+  sin comando de CLI ni conexion con el Generator/Validator. Esa integracion queda para una
+  version futura.
 
 ## Roadmap
 
@@ -253,7 +289,8 @@ Detection. (El Auditor, originalmente agrupado con el Validator en V0.4, queda s
 asignada; LLM Providers, originalmente V0.5, se reprogramo sin numero fijo cuando V0.5 se reasigno
 a CLI & Developer Experience, y V0.6 lo retomo con directriz propia; Confluence Integration,
 originalmente V0.7, se reprogramo sin numero fijo cuando V0.7 se reasigno a LLM Real Provider &
-AI Foundation.)
+AI Foundation. La evolucion conceptual de V0.8 -- integracion de `ai/` con la CLI, mejoras de
+documentacion, interoperabilidad Skill/Engine -- queda sin numero de version asignado todavia.)
 
 ## Futuras integraciones
 

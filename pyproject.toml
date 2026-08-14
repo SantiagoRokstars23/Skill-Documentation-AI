@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "skill-documentation-ai"
-version = "0.7.0"
+version = "0.8.0"
 description = "Motor de documentacion inteligente para microservicios Java/Spring Boot"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -23,7 +23,7 @@ dev = [
 spring-doc = "cli.main:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["analyzer", "providers", "validators", "generators", "validator", "cli"]
+packages = ["analyzer", "providers", "validators", "generators", "validator", "cli", "ai"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

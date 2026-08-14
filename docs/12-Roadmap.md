@@ -11,7 +11,8 @@ completarse (criterios de aceptacion + Definition of Done) antes de iniciar la s
 | V0.4 | OpenAPI Quality Validator | Completada (`v0.4.0`) |
 | V0.5 | CLI & Developer Experience | Completada (`v0.5.0`) |
 | V0.6 | LLM Providers & AI Foundation | Completada (`v0.6.0`) |
-| V0.7 | LLM Real Provider & AI Foundation | **Completada / esta version** |
+| V0.7 | LLM Real Provider & AI Foundation | Completada (`v0.7.0`) |
+| V0.8 | AI Documentation Foundation | **Completada / esta version** |
 | V1.0 | Production | Futuro |
 | V2.0 | Documentation Quality Gate | Futuro |
 | V3.0 | Drift Detection | Futuro |
@@ -81,6 +82,20 @@ sin reabrir el conflicto de numeracion anterior.
   funcionando igual que antes. Ninguna excepcion de `urllib` se propaga al consumidor: todo se
   traduce a `providers.errors`. Sin integracion con Analyzer/Generator/Validator/CLI/Skill (eso es
   V0.8). Ver `prompts/V0.7—LLM-REAL-PROVIDER-&-AI-FOUNDATION.md` y `docs/06-LLM.md`.
+- **V0.8 — AI Documentation Foundation:** primera capa que conecta el motor determinista con un
+  LLM real como consumidor: `ai/` (`DocumentationContextBuilder`, `DocumentationPromptBuilder`,
+  `DocumentationEngine`, `DocumentationContext`/`DocumentationResult`). Estrategia de llamadas
+  hibrida (una llamada de proyecto + una por endpoint, nunca una llamada global) para no requerir
+  modificar `AnthropicProvider` (que fija `max_tokens=1024` de salida, V0.7). Depende
+  exclusivamente de la abstraccion `providers.LLMProvider`; nunca de `AnthropicProvider`/
+  `urllib`/ningun SDK. Regla de evidencia extendida al LLM: el contexto entregado es la unica
+  fuente permitida, y el parser rechaza (`DocumentationParseError`) cualquier clave de
+  `parameters`/`responses`/`dtos` que el LLM devuelva sin estar en el contexto (indicio de
+  alucinacion), en vez de aceptarla. Sin integracion con Analyzer/Generator/Validator/CLI (no se
+  modifico ninguno) ni con la Skill (sigue independiente). Sin comandos nuevos de CLI. Ver
+  `prompts/V0.8—AI-DOCUMENTATION-FOUNDATION.md` y `docs/03-Arquitectura.md`. Evolucion conceptual
+  futura (sin numero de version asignado todavia): AI Documentation Enhancement, integracion de
+  la capa AI con la CLI, interoperabilidad Skill/Engine.
 - **Confluence Integration:** conexion de la salida OpenAPI con el proyecto Python existente que
   publica en Confluence. Sin numero de version asignado (ver nota de la tabla de arriba).
 - **V1.0 — Production:** endurecimiento, empaquetado y estabilizacion para uso en produccion.

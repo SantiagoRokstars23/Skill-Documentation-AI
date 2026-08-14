@@ -5,6 +5,31 @@ Todos los cambios relevantes de este proyecto se documentan en este archivo.
 El formato sigue las convenciones de [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y este proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 
+## [0.8.0] - 2026-08-14
+
+### Added
+
+- Paquete nuevo `ai/`: primera capa que conecta el motor determinista con un LLM real como consumidor (`AnalysisResult -> DocumentationContext -> prompt -> LLMProvider -> DocumentationResult`).
+- `ai/models.py`: `DocumentationContext`/`DocumentationResult` y dataclasses anidadas (`ParameterContext`, `DTOFieldContext`, `DTOContext`, `ResponseContext`, `EndpointContext`, `ParameterDocumentation`, `ResponseDocumentation`, `DTODocumentation`, `EndpointDocumentation`), todas `frozen=True` con campos `tuple[...]`, mismo patron que `analyzer/models.py`.
+- `ai/context.py`: `DocumentationContextBuilder.build(analysis_result, openapi_document=None)`. Recorrido determinista, DTOs deduplicados y ordenados alfabeticamente, colisiones de `endpoint_id` desambiguadas con sufijo numerico. `project_name` queda siempre en `None`: la unica fuente candidata (`openapi_document["info"]["title"]`) es la convencion fija del Generator ("Generated API", V0.3), no evidencia real.
+- `ai/prompts.py`: `DocumentationPromptBuilder` (`build_project_prompt`/`build_endpoint_prompt`), `PROMPT_VERSION = "1.0"`, instrucciones anti-alucinacion centralizadas.
+- `ai/parsing.py`: separa parseo/validacion (`parse_project_response`/`parse_endpoint_response`). Tolera un unico fence de markdown que envuelva la respuesta completa (regex anclada, nunca busca contenido embebido). Rechaza como posible alucinacion (`DocumentationParseError`) cualquier clave de `parameters`/`responses`/`dtos` que no este en el contexto entregado.
+- `ai/errors.py`: `DocumentationError` (base) + `DocumentationParseError`. Un error de `providers.errors` nunca se envuelve ni se mezcla con estos.
+- `ai/documentation.py`: `DocumentationEngine(provider, context_builder, prompt_builder)`, inyeccion por constructor. Estrategia de llamadas hibrida (una de proyecto + una por endpoint, nunca global) para no requerir modificar `AnthropicProvider` (que fija `max_tokens=1024` de salida, V0.7, no configurable). DTOs documentados dentro de la llamada del endpoint que los referencia, agregados deduplicados en el resultado final.
+- 70 tests nuevos (380 -> 450): modelos, context builder (contra `examples/customer-service`, determinismo, ausencia de mutacion sobre `AnalysisResult`/documento OpenAPI, proyecto vacio, DTOs anidados, colision de id), prompt builder, parsing (JSON valido/invalido, fence tolerado/parcial no tolerado, claves no reconocidas, status `null`), `DocumentationEngine` (`FakeProvider` en el caso minimo, flujo completo con un doble de prueba local para casos con multiples respuestas distintas, agregacion de DTOs, error de provider propagado sin envolver, error de parseo, determinismo, inmutabilidad), integracion end-to-end con `examples/customer-service` y `FakeProvider`, aislamiento (verificado por introspeccion de `ast` sobre imports reales, no busqueda de texto, para evitar falsos positivos con los propios docstrings de `ai/`), y una regresion de revision de codigo sobre DTOs anidados (ver mas abajo).
+- **Correccion en revision de codigo (Fase 5):** `ai/prompts.py`/`ai/parsing.py` solo resolvian los DTOs referenciados directamente por un endpoint, no los DTOs anidados dentro de esos DTOs (p. ej. `Address` dentro de `CustomerRequest`), aunque `DocumentationContextBuilder` ya los recolectaba recursivamente en `DocumentationContext.dtos`. Un DTO anidado nunca llegaba al prompt, y si el LLM lo describia igual, el parser lo rechazaba como alucinacion. Corregido con `DTOFieldContext.nested_dto_name` (campo aditivo) y `DocumentationContext.referenced_dto_names()` (resolucion transitiva con proteccion contra ciclos) como fuente unica de verdad compartida entre `ai/prompts.py` y `ai/parsing.py`.
+
+### Changed
+
+- `pyproject.toml`: version `0.7.0` -> `0.8.0`; se agrega `ai` a `tool.hatch.build.targets.wheel.packages`. Ninguna dependencia de runtime ni dev nueva.
+- `docs/03-Arquitectura.md`, `docs/06-LLM.md`, `docs/12-Roadmap.md`, `docs/13-Versionado.md`, `README.md`: actualizados para reflejar la capa `ai/`.
+
+### Scope
+
+- No se implemento RAG, embeddings, vector databases, agentes, multi-agente, MCP, tool/function calling, memoria conversacional, chat, historial, streaming, generacion de imagenes, analisis semantico avanzado, fine-tuning, entrenamiento de modelos, integracion con Confluence/Jira/GitHub, CI/CD, Docker, cloud, autenticacion, GUI, servidor HTTP, generacion de SDK, ni soporte para proveedores adicionales. Ver `docs/12-Roadmap.md`.
+- **Sin integracion con ningun consumidor real**: `analyzer/`, `generators/`, `validator/` y `cli/` no se modificaron y no importan `ai/`; la Skill (`skill/`, `skills/spring-doc/SKILL.md`) sigue completamente independiente. La CLI no gana comandos nuevos (`spring-doc ai`/`chat`/`ask`/`document` no existen).
+- `AnthropicProvider` no se modifico (decision explicita de Fase 2 para resolver la limitacion de `max_tokens` sin tocarlo).
+
 ## [0.7.0] - 2026-08-14
 
 ### Added

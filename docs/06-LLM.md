@@ -99,10 +99,38 @@ del modelo invocado (no determinista) — por eso los tests de `AnthropicProvide
   multi-turno ni memoria (fuera de alcance de V0.7).
 - `max_tokens` fijo (1024) en cada request, no configurable todavia.
 
-**Ausencia de integracion con la CLI:** V0.7 no agrega ningun comando (`spring-doc ai`/`chat`/
-`ask`/`document` no existen) ni cambia el comportamiento de `analyze`/`generate`/`validate`.
-`AnthropicProvider` existe en `providers/` pero **ningun consumidor real lo usa todavia** — esa
-integracion (que capacidad de IA concreta consume el LLM, y como) es responsabilidad de V0.8.
+**Ausencia de integracion con la CLI:** ni V0.7 ni V0.8 agregan ningun comando (`spring-doc ai`/
+`chat`/`ask`/`document` no existen) ni cambian el comportamiento de `analyze`/`generate`/
+`validate`.
+
+## Primer consumidor real: la capa `ai/` (V0.8)
+
+`ai/` es el primer componente del proyecto que efectivamente invoca `LLMProvider.generate()`.
+Orquesta `analyzer.AnalysisResult -> DocumentationContext -> prompt -> LLMProvider -> \
+DocumentationResult` (`ai/documentation.py::DocumentationEngine`), y **depende exclusivamente de
+la abstraccion `LLMProvider`** — nunca importa `AnthropicProvider`, `urllib` ni ningun SDK (ver
+`docs/03-Arquitectura.md`, seccion "AI Documentation Layer").
+
+Esto significa que `AnthropicProvider` se puede sustituir por `FakeProvider` (o cualquier
+`LLMProvider` futuro) sin modificar una sola linea de `ai/`: `DocumentationEngine` recibe el
+provider por constructor (inyeccion de dependencias), nunca lo construye internamente.
+
+**Estrategia de llamadas:** una llamada de proyecto + una llamada por endpoint (nunca una unica
+llamada global) — decision explicita motivada por una limitacion real de `AnthropicProvider`:
+`max_tokens=1024` de salida, fijo, no configurable a traves de `LLMProvider.generate(prompt: str)
+-> str`. Una respuesta global con la documentacion de un proyecto entero se quedaria sin espacio.
+Ver `docs/03-Arquitectura.md` decision arquitectonica 13 para el detalle completo.
+
+**Regla de evidencia extendida al LLM:** el contexto entregado (`DocumentationContext`) es la
+unica fuente de informacion permitida. `ai/parsing.py` no solo instruye al LLM por prompt a no
+inventar — tambien lo verifica programaticamente: cualquier clave de
+`parameters`/`responses`/`dtos` que la respuesta del LLM mencione sin estar en el contexto se
+rechaza como posible alucinacion (`DocumentationParseError`), nunca se acepta ni se descarta en
+silencio.
+
+`ai/` no modifica el Analyzer, el Generator, el Validator, la CLI ni la Skill — ninguno de esos
+componentes importa `ai/`, y `ai/` no es requerido por ninguno de ellos para funcionar (ver
+`docs/13-Versionado.md` seccion "V0.7.0 -> V0.8.0").
 
 ## Proveedores potenciales (fases futuras)
 

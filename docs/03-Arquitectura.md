@@ -54,13 +54,15 @@ Relacion conceptual entre componentes:
                       OpenAPI YAML/JSON
 ```
 
-**Importante:** esta arquitectura es conceptual para todo el proyecto. A la fecha (V0.6), estan
+**Importante:** esta arquitectura es conceptual para todo el proyecto. A la fecha (V0.8), estan
 implementados el **Analyzer** (V0.1, ampliado en V0.2), el **OpenAPI Generator** (V0.3), el
-**OpenAPI Quality Validator** (V0.4), la **CLI** (V0.5, `spring-doc`) y la **infraestructura de
-LLM Providers** (V0.6: configuracion, errores, seleccion por nombre, y un `FakeProvider`
-determinista — sin ningun provider comercial concreto). El resto de componentes (Skill como motor
-ejecutable, Auditor, Integraciones) permanecen delimitados y documentados, pero no implementados
-(ver estado por componente mas abajo).
+**OpenAPI Quality Validator** (V0.4), la **CLI** (V0.5, `spring-doc`), la **infraestructura de
+LLM Providers** (V0.6: configuracion, errores, seleccion por nombre, `FakeProvider`; V0.7:
+`AnthropicProvider`, primer provider comercial real) y la **capa AI** (V0.8, `ai/`: primer
+consumidor real de `LLMProvider` dentro del motor, sin integracion todavia con ningun otro
+componente). El resto de componentes (Skill como motor ejecutable, Auditor, Integraciones)
+permanecen delimitados y documentados, pero no implementados (ver estado por componente mas
+abajo).
 
 ## Componentes
 
@@ -133,7 +135,42 @@ ejecutable, Auditor, Integraciones) permanecen delimitados y documentados, pero 
   provider real, ver `docs/13-Versionado.md` seccion "V0.6.0 -> V0.7.0" y decision arquitectonica
   12 mas abajo). Ningun otro componente (`analyzer/`, `generators/`, `validator/`, `cli/`,
   `skill/`, `skills/`) importa `providers/` — verificado por grep y por tests de aislamiento.
-  Ningun consumidor real usa todavia `AnthropicProvider` (eso es V0.8).
+  Desde V0.8, `ai/` es el primer consumidor real (ver seccion siguiente).
+
+### AI Documentation Layer (`ai/`, implementado en V0.8)
+
+- **Responsabilidad:** primer consumidor real de `providers.LLMProvider` dentro del motor —
+  transformar un `AnalysisResult` en documentacion tecnica generada por un LLM (descripcion de
+  proyecto, de cada endpoint, de parametros/request/responses, y de los DTOs referenciados),
+  basandose exclusivamente en la evidencia del contexto entregado. Nunca inventa informacion: el
+  parser rechaza explicitamente cualquier clave que el LLM devuelva sin estar presente en el
+  contexto (`DocumentationParseError`), en vez de aceptarla en silencio.
+- **Entrada:** `analyzer.AnalysisResult` (mas, opcionalmente, un documento OpenAPI ya generado,
+  aunque V0.8 no lo usa para nada — ver decision arquitectonica 13).
+- **Salida:** `DocumentationResult` (inmutable, serializable a JSON).
+- **Dependencias:** unicamente `analyzer` (API publica) y `providers.LLMProvider` (la
+  abstraccion, nunca un provider concreto). Cero dependencias nuevas de terceros.
+- **Estructura interna:**
+  - `ai/models.py` — `DocumentationContext`/`DocumentationResult` y sus dataclasses anidadas,
+    todas `frozen=True` con campos `tuple[...]` (mismo patron que `analyzer/models.py`).
+  - `ai/context.py` — `DocumentationContextBuilder.build(analysis_result, openapi_document=None)`:
+    proyeccion determinista, inmutable y serializable de `AnalysisResult`. No llama al LLM, no
+    genera prompts, no conoce ningun provider.
+  - `ai/prompts.py` — `DocumentationPromptBuilder`, instrucciones anti-alucinacion centralizadas,
+    `PROMPT_VERSION`.
+  - `ai/parsing.py` — separa explicitamente parseo de validacion; unica tolerancia: un fence de
+    markdown que envuelva el string completo (regex anclada, nunca heuristicas de busqueda).
+  - `ai/errors.py` — `DocumentationError`/`DocumentationParseError`, deliberadamente separados de
+    `providers.errors` (un error de provider nunca se envuelve como error de documentacion).
+  - `ai/documentation.py` — `DocumentationEngine`, orquestador con inyeccion de dependencias
+    (provider/context_builder/prompt_builder por constructor). Sin HTTP, sin conocer Anthropic,
+    sin conocer la CLI, sin modificar archivos ni el documento OpenAPI original.
+- **Estado en V0.8:** infraestructura completa y probada con `FakeProvider`; `AnthropicProvider`
+  es sustituible sin modificar `ai/` (verificado). **Sin integracion con ningun consumidor real
+  todavia**: `analyzer/`, `generators/`, `validator/` y `cli/` no se modificaron y no importan
+  `ai/`; `ai/` tampoco importa la CLI ni internals del Analyzer — verificado por grep/`ast` y por
+  tests de aislamiento (`tests/test_ai_isolation.py`). La Skill (`skill/`, `skills/`) sigue
+  completamente independiente de `ai/`.
 
 ### OpenAPI Generator (implementado en V0.3)
 
@@ -334,6 +371,14 @@ estaban) ni `generators/` (el Validator consume el `dict` de salida, no llama a 
   `SPRING_DOC_LLM_*` configurada. Instalar el paquete o importar `providers/` nunca dispara una
   llamada de red (verificado por test dedicado que mockea `urllib.request.urlopen` y comprueba que
   no se invoca solo por importar).
+- (V0.8) `ai/` **no** es importado por `analyzer/`, `generators/`, `validator/` ni `cli/`, y `ai/`
+  a su vez **no** importa internals del Analyzer (`ast_analyzer`/`ast_backend`/`dto_analyzer`/
+  `spring_boot_analyzer`/`scanner`), la CLI, ni nada especifico de un provider concreto
+  (`AnthropicProvider`/`urllib`/cualquier SDK) — solo `analyzer` (API publica) y
+  `providers.LLMProvider` (la abstraccion). Verificado por introspeccion de `ast` sobre los
+  imports reales de cada archivo (no busqueda de texto: los propios docstrings de `ai/` mencionan
+  a proposito nombres como "AnthropicProvider" para explicar que no se usan, lo que produciria
+  falsos positivos con una busqueda de substring). `skill/`/`skills/` tampoco referencian `ai/`.
 
 ## Decisiones arquitectonicas relevantes
 
@@ -507,3 +552,45 @@ estaban) ni `generators/` (el Validator consume el `dict` de salida, no llama a 
       propaga hacia el consumidor.
     - Ver `docs/13-Versionado.md` seccion "V0.6.0 -> V0.7.0" para el detalle completo del formato
       de request/response y la tabla de traduccion de errores.
+
+13. **V0.8 — Capa `ai/`: estrategia de llamadas hibrida (una de proyecto + una por endpoint,
+    nunca global), sin modificar `AnthropicProvider`, sin dependencias nuevas.** El hallazgo
+    central de Fase 2: `AnthropicProvider` (V0.7) fija `max_tokens=1024` de salida, no
+    configurable a traves de `LLMProvider.generate(prompt: str) -> str` (el contrato no acepta
+    parametros adicionales). Una unica llamada global que devolviera la descripcion del proyecto
+    + todos los endpoints + DTOs en un solo JSON se quedaria sin espacio de salida para cualquier
+    proyecto con mas de un puñado de endpoints. En vez de autorizar una excepcion para ampliar
+    `AnthropicProvider`/`ProviderConfig` (explicitamente desaconsejado por la directriz salvo
+    necesidad demostrada), se opto por la estrategia hibrida, que mantiene cada llamada
+    individual pequeña por construccion y no requiere tocar `providers/` en absoluto — decision
+    presentada como pregunta explicita en Fase 2 y confirmada por el responsable del proyecto.
+    Otras decisiones explicitas de Fase 2:
+    - **`project_name` nunca se deriva de `openapi_document`**: la unica clave candidata
+      (`info.title`) es la convencion fija del Generator ("Generated API", V0.3), no evidencia
+      real — usarla presentaria un placeholder como un hecho. Encontrado durante la
+      implementacion (no en el diseño original de Fase 2) y corregido antes de continuar; ver
+      `docs/13-Versionado.md` seccion "V0.7.0 -> V0.8.0".
+    - **DTOs documentados dentro de la llamada del endpoint que los referencia**, no en una
+      llamada separada por DTO: mantiene el conteo de llamadas en `1 + N` (proyecto + endpoints)
+      en vez de `1 + N + M`, mas barato y mas simple; se agregan deduplicados en el
+      `DocumentationResult` final.
+    - **Tolerancia de un unico fence de markdown que envuelva la respuesta completa** (regex
+      anclada a inicio/fin), autorizada explicitamente en Fase 2 por ser un habito muy comun y
+      observable de los modelos de Anthropic — nunca busca llaves ni "arregla" contenido interno;
+      cualquier fence parcial (que no envuelva todo el string) se deja intacto y falla el parseo
+      naturalmente.
+    - **Deteccion programatica de alucinacion**: las claves de `parameters`/`responses`/`dtos`
+      que el LLM devuelve deben ser un subconjunto exacto de lo que el `EndpointContext` conoce;
+      cualquier clave extra se rechaza (`DocumentationParseError`) en vez de aceptarse o
+      descartarse en silencio — la regla anti-alucinacion no es solo una instruccion de prompt,
+      tambien se verifica en el codigo.
+    - **`DocumentationError`/`DocumentationParseError` nunca envuelven un error de
+      `providers.errors`**: un `ProviderTimeoutError` se propaga tal cual desde
+      `DocumentationEngine`, sin mezclarse con los errores propios de parseo (regla explicita de
+      la directriz, seccion 18).
+    - **Correccion de revision de codigo:** la primera implementacion solo resolvia los DTOs
+      referenciados directamente por un endpoint, no los anidados dentro de esos DTOs (p. ej.
+      `Address` dentro de `CustomerRequest`) — aunque el ContextBuilder ya los recolectaba
+      recursivamente. `DocumentationContext.referenced_dto_names()` (resolucion transitiva,
+      fuente unica de verdad compartida entre `ai/prompts.py` y `ai/parsing.py`) corrige esto. Ver
+      `docs/13-Versionado.md` seccion "V0.7.0 -> V0.8.0" para el detalle completo.

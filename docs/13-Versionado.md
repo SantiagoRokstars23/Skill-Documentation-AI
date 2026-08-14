@@ -265,3 +265,87 @@ timeout durante `h.getresponse()`, en cambio, no esta dentro de ese `try`, y pro
 `providers/anthropic.py` ahora inspecciona `exc.reason` dentro del handler de `URLError` para
 clasificar tambien el primero como `ProviderTimeoutError` en vez de `ProviderRequestError`, con
 test de regresion dedicado.
+
+### V0.7.0 -> V0.8.0
+
+**Sin cambios en `analyzer/`, `generators/`, `validator/`, `cli/`, `providers/`, `skill/` ni
+`skills/`.** V0.8 (AI Documentation Foundation) agrega exclusivamente el paquete nuevo `ai/`;
+verificado por tests de aislamiento (`tests/test_ai_isolation.py`, que ademas usa introspeccion
+de `ast` en vez de busqueda de texto para evitar falsos positivos con los propios docstrings de
+`ai/`, que mencionan a proposito nombres como "AnthropicProvider" para explicar que no se usan).
+
+**`ai/` (nuevo):**
+
+- `ai/models.py` — `DocumentationContext`/`DocumentationResult` y sus dataclasses anidadas
+  (`ParameterContext`, `DTOFieldContext`, `DTOContext`, `ResponseContext`, `EndpointContext`,
+  `ParameterDocumentation`, `ResponseDocumentation`, `DTODocumentation`, `EndpointDocumentation`),
+  todas `@dataclass(frozen=True)` con campos colectivos `tuple[...]` (nunca `list`/`dict`), mismo
+  patron que `analyzer/models.py`.
+- `ai/context.py` — `DocumentationContextBuilder.build(analysis_result, openapi_document=None)`.
+  Recorrido determinista de endpoints/parametros/DTOs (DTOs deduplicados y ordenados
+  alfabeticamente, recorrido recursivo de `Field.nested_dto` reimplementado localmente -- mismo
+  patron que `cli/commands.py::count_dtos`, duplicado deliberadamente porque `ai/` no puede
+  importar `cli/`). **Decision surgida durante la implementacion:** `DocumentationContext.project_name`
+  queda siempre en `None` en V0.8 -- la unica fuente candidata (`openapi_document["info"]["title"]`)
+  es la convencion fija del Generator ("Generated API", V0.3), no evidencia real del proyecto;
+  usarla habria presentado un placeholder como si fuera un hecho, violando la regla de evidencia
+  del proyecto (principio 6 de `CLAUDE.md`). `openapi_document` se sigue aceptando en la firma
+  (compatibilidad con la API acordada en Fase 2) pero no se usa para nada en V0.8.
+- `ai/prompts.py` — `DocumentationPromptBuilder` (`build_project_prompt`/`build_endpoint_prompt`),
+  `PROMPT_VERSION = "1.0"`. Instrucciones anti-alucinacion centralizadas (nunca strings dispersos),
+  en espanol (consistente con el resto de la documentacion del proyecto).
+- `ai/parsing.py` — separa explicitamente `respuesta cruda -> parsing -> validacion -> dataclass`
+  (`parse_project_response`/`parse_endpoint_response`). Tolera un unico fence de markdown que
+  envuelva TODO el string (regex anclada a inicio/fin, decision explicita autorizada en Fase 2 --
+  nunca busca llaves ni "arregla" contenido interno). Cualquier clave de
+  `parameters`/`responses`/`dtos` que no este en el `EndpointContext` correspondiente se rechaza
+  como posible alucinacion (`DocumentationParseError`), no se descarta en silencio.
+- `ai/errors.py` — `DocumentationError` (base) + `DocumentationParseError` (unica subclase
+  concreta necesaria). Un error de `providers.errors` (p. ej. `ProviderTimeoutError`) nunca se
+  envuelve ni se mezcla con estos -- se propaga tal cual desde `DocumentationEngine`.
+- `ai/documentation.py` — `DocumentationEngine(provider, context_builder, prompt_builder)`
+  (inyeccion por constructor). Estrategia de llamadas hibrida decidida y autorizada en Fase 2: una
+  llamada de proyecto + una llamada por endpoint, nunca una llamada global -- evita depender de un
+  `max_tokens` mayor al que `AnthropicProvider` ya fija (V0.7, 1024 tokens de salida, no
+  configurable), sin necesidad de modificarlo. Los DTOs se documentan dentro de la llamada del
+  endpoint que los referencia (no hay llamada separada por DTO) y se agregan deduplicados en el
+  `DocumentationResult` final.
+
+**Ninguna dependencia nueva**, runtime ni dev: `dataclasses`/`json`/`re`/`typing` de la libreria
+estandar.
+
+**Sin integracion con ningun consumidor real todavia:** ni la CLI (sin comandos nuevos, sin
+cambios de comportamiento en `analyze`/`generate`/`validate`) ni el Analyzer/Generator/Validator
+llaman a `ai/`. La Skill (`skill/` y `skills/spring-doc/SKILL.md`) sigue completamente
+independiente del motor Python.
+
+**Correccion en revision de codigo (Fase 5):** `ai/prompts.py`/`ai/parsing.py` solo resolvian los
+DTOs referenciados *directamente* por un endpoint (`request_dto_name`/`response.dto_name`), no
+los DTOs anidados dentro de esos DTOs (p. ej. `Address` dentro de `CustomerRequest`) — aunque
+`DocumentationContextBuilder._collect_dtos` ya los recolectaba correctamente (de forma recursiva)
+en `DocumentationContext.dtos`. Consecuencia: un DTO anidado nunca llegaba al prompt del endpoint
+(sin evidencia para que el LLM lo describa) y, aunque el LLM lo describiera igual, el parser lo
+rechazaba como alucinacion (`DocumentationParseError`) porque no estaba en el conjunto de nombres
+conocidos. Corregido agregando `DTOFieldContext.nested_dto_name` (campo aditivo, poblado desde
+`Field.nested_dto.name` del Analyzer) y `DocumentationContext.referenced_dto_names(endpoint)`
+(resolucion transitiva con proteccion contra ciclos), usado como fuente unica de verdad tanto por
+`ai/prompts.py` como por `ai/parsing.py::parse_endpoint_response` (que ahora recibe tambien
+`context`, no solo `endpoint`) — evita que ambos vuelvan a divergir. Tests de regresion en los
+tres niveles: `ai/models.py` (resolucion directa/transitiva/con ciclo), `ai/parsing.py` (DTO
+anidado aceptado, no rechazado), `ai/prompts.py` (contra `examples/customer-service` real: el
+prompt del endpoint que recibe `CustomerRequest` incluye tambien `Address`).
+
+70 tests nuevos (380 -> 450): modelos (inmutabilidad, serializacion), context builder (contexto
+correcto contra `examples/customer-service`, determinismo, ausencia de mutacion sobre
+`AnalysisResult` y sobre el documento OpenAPI, proyecto vacio, DTOs anidados/deduplicados,
+colision de `endpoint_id` desambiguada, `project_name` nunca derivado de `info.title`),
+prompt builder (contenido esperado, reglas anti-alucinacion, determinismo, sin secretos),
+parsing (JSON valido/invalido, fence de markdown tolerado/no tolerado si esta parcial, claves
+faltantes, tipos incorrectos, claves no reconocidas en `parameters`/`responses`/`dtos`, status
+`null` mapeado a la etiqueta `"unknown"`), `DocumentationEngine` (`FakeProvider` maneja el caso
+minimo, flujo completo con multiples endpoints via un doble de prueba local -- `FakeProvider` no
+se amplio, ver seccion 19 de la directriz --, agregacion de DTOs deduplicada entre endpoints,
+error de provider propagado sin envolver, error de parseo propagado, determinismo, ausencia de
+mutacion), integracion end-to-end contra `examples/customer-service` con `FakeProvider`, y
+aislamiento (ni `analyzer`/`generators`/`validator`/`cli` importan `ai/`, ni `skill/`/`skills/` lo
+referencian, ni `ai/` importa internals del Analyzer/`AnthropicProvider`/`urllib`/`cli`).
