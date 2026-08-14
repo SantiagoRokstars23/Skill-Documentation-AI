@@ -126,7 +126,33 @@ Skill-Documentation-AI/
 
 ## Instalacion
 
-Requiere Python 3.11 o superior.
+### Requisitos
+
+- **Python 3.11 o superior** (`requires-python = ">=3.11"` en `pyproject.toml`; no se afirma
+  soporte para versiones anteriores).
+- **pip.**
+- Para construir el paquete (wheel/sdist): el paquete `build` (`python -m pip install build`).
+
+### Nombres: que es que
+
+Estos cuatro nombres **no son el mismo string** y conviene distinguirlos antes de instalar nada:
+
+| Concepto | Valor real |
+|---|---|
+| Repositorio / carpeta del proyecto | `Skill-Documentation-AI` |
+| Nombre de distribucion Python (`pyproject.toml` -> `[project].name`, lo que muestra `pip show`) | `skill-documentation-ai` |
+| Nombre de archivo del **wheel** generado (con guiones bajos -- normalizacion automatica de `pip`/`build`, no un nombre distinto a recordar) | `skill_documentation_ai-<version>-py3-none-any.whl` |
+| Nombre de archivo del **sdist** generado | `skill_documentation_ai-<version>.tar.gz` |
+| Comando de CLI instalado (`[project.scripts]`) | `spring-doc` |
+
+El nombre del wheel/sdist **no** es `spring_doc-...`: el paquete distribuible se llama
+`skill-documentation-ai` (asi lo confirma `pyproject.toml` y asi lo reporta `pip show`); `spring-doc`
+es unicamente el nombre del comando que queda disponible despues de instalar. El sufijo de version
+en el nombre del archivo cambia en cada release -- no asumir que sera siempre `1.0.0`.
+
+### Instalacion para desarrollo (editable)
+
+Para modificar el codigo del proyecto:
 
 ```bash
 python -m venv .venv
@@ -135,10 +161,173 @@ python -m venv .venv
 # macOS/Linux
 source .venv/bin/activate
 
-pip install -e ".[dev]"
+# opcional, no obligatorio para que la instalacion funcione:
+python -m pip install --upgrade pip
+
+python -m pip install -e ".[dev]"
 ```
 
-Esto deja disponible el comando `spring-doc` (entry point definido en `[project.scripts]`).
+Esto deja disponible el comando `spring-doc` apuntando directamente al codigo fuente del
+repositorio (cualquier cambio en `analyzer/`/`generators/`/etc. se refleja sin reinstalar).
+
+### Construir e instalar desde una distribucion (wheel/sdist)
+
+Este es el camino que reproduce como instalaria el paquete alguien externo al repositorio (no
+requiere `-e`, ni mantener el repositorio clonado despues de instalar):
+
+```bash
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS/Linux
+source .venv/bin/activate
+
+python -m pip install build
+python -m build
+```
+
+Esto genera los artefactos dentro de `dist/`, por ejemplo (V1.0.0):
+
+```text
+dist/
+├── skill_documentation_ai-1.0.0-py3-none-any.whl
+└── skill_documentation_ai-1.0.0.tar.gz
+```
+
+Estos nombres cambian con la version -- verificar siempre el contenido real de `dist/` antes de
+instalar:
+
+```bash
+# Windows
+dir dist
+# Linux/macOS
+ls dist
+```
+
+Instalar el wheel real (sustituir `<wheel-generado>` por el archivo que aparecio en `dist/`):
+
+```bash
+python -m pip install dist/<wheel-generado>.whl
+```
+
+Ejemplo real para V1.0.0 (Windows, con `\` en la ruta):
+
+```cmd
+python -m pip install dist\skill_documentation_ai-1.0.0-py3-none-any.whl
+```
+
+Se usa `python -m pip install ...` (no `pip install ...` a secas) para asegurar que el `pip` que
+se ejecuta pertenece al interprete/entorno virtual activo, no a otro Python del sistema.
+
+**Desarrollo vs. instalacion desde distribucion:**
+
+```text
+python -m pip install -e .          python -m build
+        |                                   |
+        v                                   v
+  desarrollo local              dist/<wheel>.whl + dist/<sdist>.tar.gz
+                                             |
+                                             v
+                              python -m pip install dist/<wheel>.whl
+                                             |
+                                             v
+                        prueba tal como lo instalaria un usuario externo
+```
+
+### Quick start desde un clone limpio
+
+```bash
+git clone https://github.com/SantiagoRokstars23/Skill-Documentation-AI.git
+cd Skill-Documentation-AI
+
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS/Linux
+source .venv/bin/activate
+
+python -m pip install build
+python -m build
+
+# Windows
+dir dist
+# Linux/macOS
+ls dist
+
+python -m pip install dist/<wheel-generado>.whl
+
+spring-doc --version
+spring-doc --help
+```
+
+### Verificacion
+
+```bash
+spring-doc --version
+spring-doc --help
+```
+
+Salida esperada (Example output for V1.0.0; en versiones futuras el numero cambia):
+
+```text
+spring-doc 1.0.0
+```
+
+### Solucion de problemas comunes
+
+**`dist\...whl` no existe / "looks like a filename, but the file does not exist":**
+
+```text
+WARNING: Requirement 'dist\....whl' looks like a filename,
+but the file does not exist
+```
+
+Mismo mensaje para dos causas distintas (verificado): `dist/` todavia no existe porque el paquete
+no fue construido, **o** el nombre de archivo escrito no coincide con el que realmente generó
+`python -m build`. Solucion en ambos casos:
+
+```bash
+python -m build
+# Windows
+dir dist
+# Linux/macOS
+ls dist
+```
+
+... y usar exactamente el nombre de archivo que aparece ahi.
+
+**`No module named build`:**
+
+```bash
+python -m pip install build
+python -m build
+```
+
+**`spring-doc` no se reconoce como comando** (Windows: mensaje similar a `'spring-doc' is not
+recognized as an internal or external command`; Linux/macOS: `spring-doc: command not found`):
+casi siempre significa que el entorno virtual donde se instalo no esta activo. Verificar:
+
+```bash
+# Windows
+.venv\Scripts\activate
+# Linux/macOS
+source .venv/bin/activate
+
+python -m pip show skill-documentation-ai
+```
+
+Si `pip show` no encuentra el paquete, la instalacion no se completo correctamente en ese entorno
+-- repetir el paso de `python -m pip install ...` (editable o desde wheel, segun corresponda).
+
+**Se instalo una version distinta a la esperada:**
+
+```bash
+spring-doc --version
+python -m pip show skill-documentation-ai
+```
+
+`pip show` reporta la version realmente instalada en el entorno activo; si no coincide con el
+`dist/*.whl` que se intento instalar, confirmar que el entorno virtual activo es el correcto.
 
 ## Uso de la CLI
 
