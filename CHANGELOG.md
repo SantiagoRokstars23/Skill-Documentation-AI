@@ -5,6 +5,29 @@ Todos los cambios relevantes de este proyecto se documentan en este archivo.
 El formato sigue las convenciones de [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y este proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 
+## [0.9.0] - 2026-08-14
+
+### Added
+
+- `ai/enrichment.py`: `apply_documentation(document, documentation, context) -> (dict, list[str])`, mismo patron de firma que `generators.generate() -> (document, diagnostics)`. Aplica un `DocumentationResult` sobre un documento OpenAPI ya generado, escribiendo exclusivamente en campos de texto libre (`info.description`, `summary`/`description` de operacion, `description` de parametro, `description` de response -- solo si coincide con el placeholder fijo conocido del Generator --, `description` de schema). Nunca toca paths, metodos, parametros estructurales, tipos, status codes ni `$ref` -- garantia estructural, no solo de comportamiento, ya que los tipos de `ai/models.py` que recibe no tienen ningun campo capaz de representar esa informacion. Cualquier desajuste (`endpoint_id`/DTO/parametro que ya no existe) se reporta como diagnostic, nunca como excepcion. No muta el documento de entrada (`copy.deepcopy`). Reutiliza por convencion (sin importar `validator/`) el mismo texto de placeholder de respuesta que `validator/openapi_rules.py` ya detecta desde V0.4.
+- `ai/models.py`: `EndpointDocumentation` gana el campo obligatorio `summary: str` (corto, siempre presente, distinto de `description`, que puede seguir vacia). `ai/prompts.py`/`ai/parsing.py` actualizados en consecuencia.
+- `skills/spring-doc/SKILL.md` evolucionada (no reemplazada): el contenido original (V0.6/V0.7, LLM/agente/motor-agnostico) se mantiene intacto como modo por defecto. Se agrega, delimitada por el encabezado `## Optional: end-to-end orchestration using the spring-doc engine`, una seccion nueva y explicitamente opcional que documenta un flujo de 9 pasos usando la CLI `spring-doc` (`analyze`/`generate`/`validate`) y las abstracciones publicas del motor (`ProviderConfig`/`get_provider`), terminando en `apply_documentation`. Esta seccion nunca nombra un LLM/agente/proveedor concreto (Claude Code, OpenCode, Codex, ChatGPT, Anthropic, Gemini, OpenAI): usa siempre lenguaje neutral ("the agent", "an LLM provider"), y declara explicitamente que el motor y el LLM son mejoras opcionales, nunca requisitos.
+- `tests/test_e2e_documentation.py`: integracion end-to-end completa (`analyze_project -> generate -> DocumentationContextBuilder -> DocumentationEngine -> apply_documentation -> validate`) contra `examples/customer-service`, con un doble de prueba local (no `FakeProvider`, para poder responder distinto a un prompt de proyecto que a uno de endpoint).
+- 32 tests nuevos (450 -> 482): `ai/enrichment.py` (inmutabilidad, aplicacion y no-sobrescritura de cada campo de texto libre, `endpoint_id`/DTO desconocido como diagnostic no como excepcion, reemplazo de placeholder de response sin tocar texto real, reconciliacion del status `"unknown"` con la clave `"default"` del Generator, diagnostic explicito para un status ausente del documento, parametro `source="body"` sin corromper el documento, ausencia total de paths/operaciones agregados o eliminados, test de no invencion sobre los campos del dataclass, paso completo por `validator` sin nuevos errores, determinismo, resultado vacio sin diagnostics), integracion end-to-end (5 tests), y reescritura de `tests/test_skill_spring_doc.py` para el esquema de dos modos (division del archivo por el encabezado de la seccion opcional, verificacion de que la seccion opcional referencia la CLI/API publica, de que se declara explicitamente opcional con fallback documentado, y de que ninguno de los dos modos nombra un LLM/proveedor concreto).
+- **Correccion en revision de codigo (Fase 5):** `ai/enrichment.py` buscaba la respuesta LLM-documentada por la clave literal `"unknown"` (`ai/parsing.py::status_label()`, V0.8, usada cuando no hay evidencia de `@ResponseStatus`), pero el documento OpenAPI real usa `"default"` para ese mismo caso (convencion del Generator, V0.3) -- la descripcion generada se perdia en silencio para la mayoria de los endpoints de un proyecto real (7/8 en `examples/customer-service`). Corregido con `_resolve_response_key()`, que reintenta con `"default"` cuando la clave literal es `UNKNOWN_STATUS_LABEL`; un status que sigue sin coincidir ahora se reporta como diagnostic en vez de perderse sin explicacion.
+
+### Changed
+
+- `pyproject.toml`: version `0.8.0` -> `0.9.0`. Ninguna dependencia de runtime ni dev nueva (`ai/enrichment.py` usa exclusivamente `copy`, libreria estandar).
+- `docs/03-Arquitectura.md`, `docs/06-LLM.md`, `docs/12-Roadmap.md`, `docs/13-Versionado.md`, `README.md`: actualizados para reflejar `ai/enrichment.py` y la evolucion de doble modo de la Skill.
+
+### Scope
+
+- No se implemento RAG, embeddings, vector databases, agentes, multi-agente, MCP, tool/function calling, memoria conversacional, chat, historial, streaming, generacion de imagenes, fine-tuning, integracion con Confluence/Jira/GitHub, CI/CD, Docker, cloud, autenticacion, GUI, servidor HTTP, generacion de SDK. Ver `docs/12-Roadmap.md`.
+- **Sin comandos de CLI nuevos**: `cli/` no se modifico; la orquestacion end-to-end descrita en la seccion opcional de la Skill es un proceso para que el agente ejecute paso a paso, no una nueva funcionalidad de la CLI existente.
+- `analyzer/`, `generators/`, `validator/`, `cli/` y `providers/` no se modificaron. Verificado por tests de aislamiento existentes (`tests/test_ai_isolation.py`, cuya cobertura basada en `glob` cubre automaticamente `ai/enrichment.py` sin tests nuevos de aislamiento) y por grep manual (`ai/enrichment.py` solo importa `copy` y `.models`).
+- La Skill conceptual (`skill/`, singular, V0.1) sigue sin relacion con `skills/spring-doc/` ni con `ai/`.
+
 ## [0.8.0] - 2026-08-14
 
 ### Added

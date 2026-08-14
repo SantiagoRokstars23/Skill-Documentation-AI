@@ -224,6 +224,7 @@ class DTODocumentation:
 @dataclass(frozen=True)
 class EndpointDocumentation:
     endpoint_id: str
+    summary: str
     description: str
     parameters: tuple[ParameterDocumentation, ...] = field(default_factory=tuple)
     request_description: str | None = None
@@ -232,6 +233,7 @@ class EndpointDocumentation:
     def to_dict(self) -> dict:
         return {
             "endpoint_id": self.endpoint_id,
+            "summary": self.summary,
             "description": self.description,
             "parameters": [p.to_dict() for p in self.parameters],
             "request_description": self.request_description,

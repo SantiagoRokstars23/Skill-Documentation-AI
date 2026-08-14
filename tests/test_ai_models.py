@@ -114,6 +114,7 @@ def test_documentation_result_to_dict_is_json_serializable():
         endpoints=(
             EndpointDocumentation(
                 endpoint_id="GET /x",
+                summary="resumen",
                 description="desc",
                 parameters=(ParameterDocumentation(name="id", description="el id"),),
                 request_description=None,
@@ -126,6 +127,7 @@ def test_documentation_result_to_dict_is_json_serializable():
     parsed = json.loads(result.to_json())
     assert parsed["project_description"] == "desc"
     assert parsed["endpoints"][0]["endpoint_id"] == "GET /x"
+    assert parsed["endpoints"][0]["summary"] == "resumen"
     assert parsed["dtos"][0]["name"] == "X"
 
 

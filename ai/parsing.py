@@ -114,6 +114,7 @@ def parse_endpoint_response(
     prompt -- ambas deben coincidir exactamente."""
     data = _load_json_object(raw)
 
+    summary = _require_str(data, "summary")
     description = _require_str(data, "endpoint_description")
     request_description = _require_str(data, "request_description", allow_none=True)
 
@@ -139,6 +140,7 @@ def parse_endpoint_response(
 
     endpoint_documentation = EndpointDocumentation(
         endpoint_id=endpoint.id,
+        summary=summary,
         description=description,
         parameters=parameters,
         request_description=request_description,

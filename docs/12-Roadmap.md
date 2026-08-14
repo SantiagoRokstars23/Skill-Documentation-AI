@@ -12,7 +12,8 @@ completarse (criterios de aceptacion + Definition of Done) antes de iniciar la s
 | V0.5 | CLI & Developer Experience | Completada (`v0.5.0`) |
 | V0.6 | LLM Providers & AI Foundation | Completada (`v0.6.0`) |
 | V0.7 | LLM Real Provider & AI Foundation | Completada (`v0.7.0`) |
-| V0.8 | AI Documentation Foundation | **Completada / esta version** |
+| V0.8 | AI Documentation Foundation | Completada (`v0.8.0`) |
+| V0.9 | Skill + End-to-End Documentation | **Completada / esta version** |
 | V1.0 | Production | Futuro |
 | V2.0 | Documentation Quality Gate | Futuro |
 | V3.0 | Drift Detection | Futuro |
@@ -96,6 +97,25 @@ sin reabrir el conflicto de numeracion anterior.
   `prompts/V0.8—AI-DOCUMENTATION-FOUNDATION.md` y `docs/03-Arquitectura.md`. Evolucion conceptual
   futura (sin numero de version asignado todavia): AI Documentation Enhancement, integracion de
   la capa AI con la CLI, interoperabilidad Skill/Engine.
+- **V0.9 — Skill + End-to-End Documentation:** conecta las piezas de V0.1-V0.8 en un flujo
+  completo. `ai/enrichment.py::apply_documentation(document, documentation, context) -> (dict,
+  list[str])` aplica un `DocumentationResult` sobre un OpenAPI ya generado, escribiendo
+  exclusivamente en campos de texto libre (`summary`/`description`) -- nunca en paths, metodos,
+  parametros estructurales, tipos, status codes ni `$ref`; cualquier desajuste se reporta como
+  diagnostic, nunca como excepcion ni corrupcion silenciosa. `EndpointDocumentation` gana el
+  campo `summary` junto al `description` ya existente desde V0.8. `skills/spring-doc/SKILL.md`
+  se evoluciona (no se reemplaza): el modo por defecto (lectura directa de codigo, V0.6/V0.7)
+  queda intacto, y se agrega una seccion nueva y claramente delimitada, "Optional: end-to-end
+  orchestration using the spring-doc engine", que documenta el flujo de 9 pasos (inspeccion,
+  analisis, generacion, validacion, contexto, enriquecimiento, integracion, validacion final,
+  reporte) usando la CLI `spring-doc` y las abstracciones publicas del motor
+  (`ProviderConfig`/`get_provider`) -- siempre en lenguaje neutral respecto al LLM/agente ("the
+  agent", "an LLM provider"), sin mencionar ni depender de Claude Code/OpenCode/Codex/ChatGPT/
+  Anthropic/Gemini/OpenAI en ningun momento. El motor sigue siendo util sin ningun LLM
+  configurado (el contrato base de `spring-doc generate`/`validate` es ya documentacion completa
+  y valida por si sola). Sin cambios en Analyzer/Generator/Validator/CLI/providers. Sin comandos
+  de CLI nuevos. Ver `prompts/V0.9—SKILL-&-END-TO-END-DOCUMENTATION.md` y
+  `docs/03-Arquitectura.md`.
 - **Confluence Integration:** conexion de la salida OpenAPI con el proyecto Python existente que
   publica en Confluence. Sin numero de version asignado (ver nota de la tabla de arriba).
 - **V1.0 — Production:** endurecimiento, empaquetado y estabilizacion para uso en produccion.

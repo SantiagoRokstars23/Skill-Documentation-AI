@@ -287,3 +287,105 @@ shapes) and treat that output as additional evidence to ground your reading of t
 using it is entirely optional, never a requirement of this skill, and this skill does not depend
 on its internal design, its command syntax, or its output format in any way. Everything this
 skill asks you to do can be done by reading `.java` source files directly.
+
+---
+
+## Optional: end-to-end orchestration using the spring-doc engine
+
+Everything above is the default mode of this skill: reading source code directly, with no tooling
+at all beyond the ability to read files. This section describes an **additional, optional** mode
+for an agent that has access to the `spring-doc` command-line engine and, optionally, a
+configured LLM provider. Neither is required for this skill to be useful — an agent with neither
+should use the default mode above and stop there.
+
+**Independence, stated explicitly:** this section does not name, require, or assume any specific
+LLM, model, or agent. "The agent" means whatever is carrying out this process. "An LLM provider"
+means whatever implementation is configured in the environment (or none at all) — this skill has
+no opinion on which one, and works the same regardless. Nothing here is written for, or tied to,
+one particular coding agent or one particular LLM vendor.
+
+Every principle from the sections above still applies without exception in this mode — evidence
+over assumption, never invent, preserve uncertainty, distinguish fact from inference. This mode
+only changes *how* evidence is gathered (via the engine's analysis instead of, or in addition to,
+reading source directly) and *how* the result is packaged (a validated OpenAPI document instead
+of, or alongside, prose).
+
+### When to use this mode
+
+Use it when the `spring-doc` engine is available in the environment and the goal is a validated
+OpenAPI artifact, not just prose. Fall back to the default mode above when the engine isn't
+installed, or when the goal is documentation *about* the API rather than a machine-readable
+contract.
+
+### Process
+
+1. **Inspect.** Identify the project root, build system, and Java/Spring Boot version. Do not
+   modify source code.
+2. **Analyze.** Run the engine's analysis command against the project:
+
+       spring-doc analyze <project> --json
+
+   Its output includes controllers, endpoints, parameters, DTOs, responses, and diagnostics about
+   anything it could not determine — treat those diagnostics the same way this skill treats any
+   other unresolved evidence: surface them, do not paper over them.
+3. **Generate a base contract.** Produce a base OpenAPI document from the analysis:
+
+       spring-doc generate <project> --format yaml --output openapi.yaml
+
+4. **Validate the base contract.**
+
+       spring-doc validate openapi.yaml --json
+
+   If it reports structural errors: report them; fix only what belongs to this flow (re-run
+   analysis/generation after a legitimate source-code fix — never hand-edit the OpenAPI document
+   to make an error disappear); re-validate. Do not invent information to hide a validation error.
+5. **Prepare a compact context.** If an LLM provider is configured and available in the
+   environment, build a compact, structured context from the analysis output — endpoint, method,
+   path, parameters, request/response models, status codes, whatever the engine could determine —
+   prioritizing exactly this information over sending entire source files or the whole project.
+   If no provider is configured or available, skip directly to step 8: the base contract from
+   steps 1–4 is already the final result.
+6. **Request enrichment.** Ask the configured LLM provider to improve the documentation (better
+   summaries, descriptions, explanations) using *only* the context prepared in the previous step.
+   Conceptually, resolving and invoking the provider looks like:
+
+       config = ProviderConfig.from_env()
+       provider = get_provider(config)
+       # ... build context/prompts from the analysis, call provider.generate(prompt) ...
+
+   Never send secrets discovered during inspection (API keys, passwords, tokens, credentials) to
+   the provider — keep the context limited to API-shape information. Require a structured
+   response (not free text), and require that it never introduce information absent from the
+   context; anything that can't be determined should be omitted, marked as unknown, or given a
+   neutral description — never invented. If the provider fails or is unreachable, treat it the
+   same as "no provider configured": fall back to the base contract, do not fail the whole
+   process.
+7. **Apply the result.** Merge the generated text back into the base contract, writing only into
+   descriptive fields (summaries, descriptions) — never into paths, methods, parameter
+   definitions, required flags, types, status codes, or schema structure. Anything from the
+   provider that cannot be matched back to something the analysis actually found must be
+   discarded, with a note of why, instead of forced in.
+8. **Validate again.**
+
+       spring-doc validate openapi.yaml --json
+
+   The documentation is not considered finished until this passes.
+9. **Report.** Summarize: project processed; endpoints found; DTOs found; whether enrichment ran
+   and whether a provider was used (never which specific vendor/model, unless the operator of the
+   environment already knows and asked for that detail); warnings; errors; files produced.
+
+### What the LLM may and may not do in this mode
+
+May: improve summaries and descriptions, explain behavior evident from the analysis, summarize
+endpoints, explain DTOs, suggest what information appears to be missing.
+
+May not: invent endpoints, parameters, DTOs, or responses; silently change anything the analysis
+already determined; claim behavior the analysis doesn't support; replace the analysis step.
+
+### Fallback behavior
+
+The base contract produced by steps 1–4 is already complete, valid documentation on its own.
+Steps 5–7 are a pure enrichment layer on top of it: their absence (engine present but no LLM
+support wired up, no provider configured, no network access, a provider error) must never be
+treated as a failure of the overall process — the base contract remains the deliverable, and step
+9's report should say plainly that no enrichment happened and why.

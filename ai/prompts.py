@@ -37,19 +37,24 @@ Formato de respuesta esperado (unicamente estas claves, JSON valido):
 _ENDPOINT_RESPONSE_FORMAT = """\
 Formato de respuesta esperado (unicamente estas claves, JSON valido):
 {
-  "endpoint_description": "<texto>",
+  "summary": "<texto corto, una linea, siempre presente>",
+  "endpoint_description": "<texto largo, solo si el endpoint tiene logica real que explicar; usa cadena vacia \\"\\" si no aplica>",
   "parameters": {"<nombre_de_parametro_del_contexto>": "<texto>"},
   "request_description": "<texto o null si el endpoint no tiene request body>",
   "responses": {"<status_del_contexto>": "<texto>"},
   "dtos": {"<nombre_de_dto_del_contexto>": "<texto>"}
 }
-Las claves de "parameters", "responses" y "dtos" deben ser EXACTAMENTE un \
-subconjunto de los nombres/status que aparecen en el contexto entregado -- \
-nunca inventes una clave que no este ahi. Para "responses", usa el valor de \
-"status" del contexto tal cual (como texto); si "status" es null en el \
-contexto, usa la clave "unknown". Si el endpoint no tiene \
-parametros/responses/dtos en el contexto, devuelve un objeto vacio ({}) para \
-esa clave."""
+"summary" es siempre obligatorio, incluso para un endpoint trivial. \
+"endpoint_description" solo debe tener contenido real cuando el endpoint tiene \
+validaciones, parametros no triviales, o errores de negocio mas alla de un \
+fallback generico -- para un endpoint simple, usa cadena vacia en vez de \
+repetir el summary con relleno. Las claves de "parameters", "responses" y \
+"dtos" deben ser EXACTAMENTE un subconjunto de los nombres/status que \
+aparecen en el contexto entregado -- nunca inventes una clave que no este \
+ahi. Para "responses", usa el valor de "status" del contexto tal cual (como \
+texto); si "status" es null en el contexto, usa la clave "unknown". Si el \
+endpoint no tiene parametros/responses/dtos en el contexto, devuelve un \
+objeto vacio ({}) para esa clave."""
 
 
 class DocumentationPromptBuilder:

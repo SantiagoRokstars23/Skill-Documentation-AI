@@ -34,6 +34,7 @@ def _context(*, dtos: tuple[DTOContext, ...] = (), endpoint: EndpointContext | N
 
 def _endpoint_payload(**overrides) -> dict:
     payload = {
+        "summary": "resumen",
         "endpoint_description": "desc",
         "parameters": {},
         "request_description": None,
@@ -100,11 +101,29 @@ def test_parse_endpoint_response_valid_minimal():
     doc, dtos = parse_endpoint_response(raw, _context(), endpoint)
 
     assert doc.endpoint_id == "GET /x"
+    assert doc.summary == "resumen"
     assert doc.description == "desc"
     assert doc.parameters == ()
     assert doc.request_description is None
     assert doc.responses == ()
     assert dtos == ()
+
+
+def test_parse_endpoint_response_missing_summary_raises():
+    endpoint = _endpoint()
+    payload = _endpoint_payload()
+    del payload["summary"]
+
+    with pytest.raises(DocumentationParseError):
+        parse_endpoint_response(json.dumps(payload), _context(), endpoint)
+
+
+def test_parse_endpoint_response_summary_wrong_type_raises():
+    endpoint = _endpoint()
+    raw = json.dumps(_endpoint_payload(summary=123))
+
+    with pytest.raises(DocumentationParseError):
+        parse_endpoint_response(raw, _context(), endpoint)
 
 
 def test_parse_endpoint_response_with_known_parameter():

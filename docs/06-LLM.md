@@ -132,6 +132,26 @@ silencio.
 componentes importa `ai/`, y `ai/` no es requerido por ninguno de ellos para funcionar (ver
 `docs/13-Versionado.md` seccion "V0.7.0 -> V0.8.0").
 
+## Cerrando el ciclo: `apply_documentation` (V0.9)
+
+`ai/enrichment.py::apply_documentation(document, documentation, context)` es el paso final del
+flujo que empieza en `DocumentationEngine`: toma el `DocumentationResult` ya generado por el LLM
+(via la abstraccion `LLMProvider`, nunca un provider concreto) y lo aplica sobre un documento
+OpenAPI ya construido por `generators.generate()`. Solo escribe en campos de texto libre
+(`summary`/`description` en sus distintas ubicaciones); nunca en estructura (paths, metodos,
+parametros, tipos, status codes, `$ref`). Cualquier desajuste entre lo que el LLM documento y lo
+que el documento contiene se reporta como diagnostic, nunca como excepcion — mismo patron de
+tolerancia que ya usan `generators.generate()` y `validator.validate()` frente a evidencia
+incompleta. Ver `docs/03-Arquitectura.md` decision arquitectonica 14 y `docs/13-Versionado.md`
+seccion "V0.8.0 -> V0.9.0".
+
+**Ausencia de integracion con la CLI (se mantiene en V0.9):** ni V0.7, ni V0.8, ni V0.9 agregan
+ningun comando (`spring-doc ai`/`chat`/`ask`/`document` no existen) ni cambian el comportamiento
+de `analyze`/`generate`/`validate`. El flujo `DocumentationEngine -> apply_documentation` esta
+disponible como API Python (`ai/`) y como proceso documentado para un agente en la seccion
+opcional de `skills/spring-doc/SKILL.md` (`## Optional: end-to-end orchestration using the
+spring-doc engine`) — nunca como una nueva funcionalidad de `cli/`.
+
 ## Proveedores potenciales (fases futuras)
 
 - ~~Claude (Anthropic)~~ — implementado en V0.7 (`AnthropicProvider`), ver arriba.

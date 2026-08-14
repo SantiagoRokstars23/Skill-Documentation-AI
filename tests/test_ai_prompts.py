@@ -103,3 +103,9 @@ def test_endpoint_prompt_requests_json_only_response():
     context = _context()
     prompt = DocumentationPromptBuilder().build_endpoint_prompt(context, context.endpoints[0].id)
     assert "JSON" in prompt
+
+
+def test_endpoint_prompt_requests_summary_field():
+    context = _context()
+    prompt = DocumentationPromptBuilder().build_endpoint_prompt(context, context.endpoints[0].id)
+    assert '"summary"' in prompt

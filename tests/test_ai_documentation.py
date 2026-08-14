@@ -22,6 +22,7 @@ from providers import FakeProvider, LLMProvider, ProviderTimeoutError
 EXAMPLE_PROJECT = Path(__file__).resolve().parent.parent / "examples" / "customer-service"
 
 _EMPTY_ENDPOINT_PAYLOAD = {
+    "summary": "resumen",
     "endpoint_description": "desc",
     "parameters": {},
     "request_description": None,

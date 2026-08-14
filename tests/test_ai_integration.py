@@ -21,6 +21,7 @@ EXAMPLE_PROJECT = Path(__file__).resolve().parent.parent / "examples" / "custome
 _FIXED_RESPONSE = json.dumps(
     {
         "project_description": "N/A",
+        "summary": "N/A",
         "endpoint_description": "N/A",
         "parameters": {},
         "request_description": None,
