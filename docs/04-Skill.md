@@ -1,5 +1,28 @@
 # 04 — Skill
 
+> **Estado (V1.0) -- leer antes que el resto del documento.** Este documento describe `skill/`
+> (singular): el diseño conceptual original de V0.1 para una Skill que consumiria metadata ya
+> extraida por el Analyzer de este proyecto. Ese diseño **nunca se implemento como codigo
+> ejecutable**: ningun componente del repositorio carga, importa ni invoca `skill/SKILL.md` como
+> parte de un flujo real (verificado por busqueda en todo el codigo Python -- la unica mencion de
+> `skill/` fuera de este documento esta dentro de un test de aislamiento de `ai/`, como parte de un
+> chequeo de que `ai/` no lo referencia, no como una dependencia real). `skill/` se conserva como
+> pieza historica/conceptual, para trazabilidad de la arquitectura original -- no se elimina sin
+> autorizacion separada, pero no debe leerse como un componente activo del pipeline.
+>
+> El artefacto que realmente se construyo y funciona end-to-end es
+> **`skills/spring-doc/SKILL.md`** (plural, V0.6, evolucionado en V0.9): sigue un diseño distinto
+> y deliberadamente mas simple -- documenta un microservicio leyendo su codigo fuente Java
+> directamente, sin depender de ningun Analyzer, y desde V0.9 incluye ademas una seccion opcional
+> que orquesta el motor real (`analyze -> generate -> validate -> apply_documentation -> validate`).
+> Es el artefacto que `README.md` recomienda para uso real. Ver `docs/03-Arquitectura.md`, seccion
+> "`skills/spring-doc/SKILL.md`", para el detalle completo y la nota de nomenclatura frente a este
+> documento.
+>
+> El resto de este documento (estructura, responsabilidades, reglas, relacion con el LLM/Analyzer)
+> se conserva sin modificar como registro del diseño original de V0.1 -- no describe comportamiento
+> implementado hoy.
+
 > V0.2 no modifica la Skill (no estaba en su Scope Lock). Se documenta aqui unicamente que la
 > evidencia que la Skill podra recibir en fases futuras es ahora considerablemente mas rica:
 > ademas de `Endpoint`/`Parameter`, el Analyzer produce `Controller`, `DTO`/`Field` (con

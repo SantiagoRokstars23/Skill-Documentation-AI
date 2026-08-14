@@ -3,7 +3,11 @@
 > Ninguna integracion externa esta implementada en V0.1. Este documento describe la unica
 > integracion futura contemplada actualmente: Confluence.
 
-## Integracion con Confluence (futura, V0.7)
+## Integracion con Confluence (futura, sin numero de version asignado)
+
+> El roadmap original asignaba esta integracion a V0.7; la directriz real recibida para V0.7
+> prioriza el primer provider LLM real (`AnthropicProvider`), y "Confluence Integration" se
+> reprogramo sin numero de version fijo (ver la nota correspondiente en `docs/12-Roadmap.md`).
 
 El flujo de integracion conceptual es:
 

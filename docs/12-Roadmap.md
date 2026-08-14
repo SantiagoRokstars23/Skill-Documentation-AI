@@ -13,8 +13,8 @@ completarse (criterios de aceptacion + Definition of Done) antes de iniciar la s
 | V0.6 | LLM Providers & AI Foundation | Completada (`v0.6.0`) |
 | V0.7 | LLM Real Provider & AI Foundation | Completada (`v0.7.0`) |
 | V0.8 | AI Documentation Foundation | Completada (`v0.8.0`) |
-| V0.9 | Skill + End-to-End Documentation | **Completada / esta version** |
-| V1.0 | Production | Futuro |
+| V0.9 | Skill + End-to-End Documentation | Completada (`v0.9.0`) |
+| V1.0 | Production Readiness | Futuro |
 | V2.0 | Documentation Quality Gate | Futuro |
 | V3.0 | Drift Detection | Futuro |
 | — | Confluence Integration | Futuro, sin numero de version asignado (ver nota mas abajo) |
@@ -118,7 +118,25 @@ sin reabrir el conflicto de numeracion anterior.
   `docs/03-Arquitectura.md`.
 - **Confluence Integration:** conexion de la salida OpenAPI con el proyecto Python existente que
   publica en Confluence. Sin numero de version asignado (ver nota de la tabla de arriba).
-- **V1.0 — Production:** endurecimiento, empaquetado y estabilizacion para uso en produccion.
+- **V1.0 — Production Readiness:** release de estabilizacion, no un nuevo ciclo de funcionalidades.
+  Convierte el estado funcional alcanzado en V0.9 en una version instalable, reproducible,
+  documentada y utilizable como producto -- sin modificar Analyzer/Generator/Validator/CLI/
+  providers/`ai/`/Skill. Auditoria de Fase 1 confirmo: `python -m build` produce sdist+wheel
+  limpiamente; una instalacion no editable desde el wheel, en un venv nuevo y un directorio ajeno
+  al repositorio, ejecuta `spring-doc --version`/`--help` y el flujo completo `analyze --openapi
+  -> validate` contra `examples/customer-service` sin ningun error; los artefactos de ejemplo
+  (`openapi.json` exacto, `openapi.yaml` con el cuerpo exacto) son reproducibles; no hay secretos
+  reales en el repositorio; cada paquete (`analyzer`/`generators`/`validator`/`providers`/`ai`)
+  ya declara `__all__` explicito. El trabajo de V1.0 es documental: sincroniza `docs/12-Roadmap.md`
+  (esta fila), `docs/09-Auditoria.md` y `docs/11-Integracion.md` (referencias a versiones ya
+  reasignadas), `docs/02-Objetivos.md` (asignaciones de version obsoletas), resuelve
+  explicitamente en `docs/04-Skill.md` la relacion entre `skill/` (diseño conceptual de V0.1,
+  nunca implementado como codigo ejecutable -- cero consumidores reales, verificado por grep) y
+  `skills/spring-doc/SKILL.md` (el artefacto realmente funcional desde V0.6), documenta la API
+  publica de Python en `README.md` a partir de los `__all__` reales, y deja registrada la decision
+  sobre `validators/` (placeholder historico sin uso, se mantiene por la gobernanza ya establecida
+  en `CLAUDE.md`, no se elimina sin autorizacion separada). Ver
+  `prompts/V1.0—PRODUCTION-READINESS.md` y `docs/13-Versionado.md` seccion "V0.9.0 -> V1.0.0".
 - **V2.0 — Documentation Quality Gate:** control de calidad de documentacion como gate en flujos
   de desarrollo.
 - **V3.0 — Drift Detection:** deteccion automatica de divergencias entre codigo y documentacion.

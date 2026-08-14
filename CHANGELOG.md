@@ -5,6 +5,30 @@ Todos los cambios relevantes de este proyecto se documentan en este archivo.
 El formato sigue las convenciones de [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y este proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 
+## [1.0.0] - 2026-08-14
+
+### Added
+
+- Seccion "API publica" en `README.md`: contrato estable de cada paquete derivado 1:1 de sus `__all__` reales (`analyzer`, `generators`, `validator`, `providers`, `ai`), mas la lista explicita de submodulos internos que no deben importarse directamente. Verificado programaticamente contra el codigo, cero discrepancias.
+- Bloque de estado en `docs/04-Skill.md` que resuelve explicitamente la diferencia historica entre `skill/` (diseño conceptual de V0.1, nunca implementado como codigo ejecutable -- cero consumidores reales, verificado con `git grep` sobre todos los `.py` trackeados) y `skills/spring-doc/SKILL.md` (el artefacto que si funciona end-to-end desde V0.6).
+- Decision explicita registrada en `docs/03-Arquitectura.md` sobre `validators/`: confirmado sin ninguna referencia real en el repositorio; se mantiene como paquete historico/reservado por la gobernanza ya establecida en `CLAUDE.md`, no se elimina sin autorizacion separada.
+
+### Changed
+
+- `pyproject.toml`: version `0.9.0` -> `1.0.0`. Ninguna dependencia nueva, runtime ni dev.
+- `docs/12-Roadmap.md`: fila de V0.9 corregida (`Completada / esta version` -> `Completada (\`v0.9.0\`)`); V1.0 renombrada de "Production" a "Production Readiness"; bullet completo con el resultado de la auditoria de Fase 1.
+- `docs/09-Auditoria.md`, `docs/11-Integracion.md`: corregidas referencias a versiones ya reasignadas (Auditor ya no "V0.4"; Confluence ya no "V0.7") -- desactualizadas desde hace 6 y 3 versiones respectivamente.
+- `docs/02-Objetivos.md`: corregidas asignaciones de version obsoletas en "Objetivos futuros" (CLI listada como V0.6 -> V0.5; Confluence como V0.7 -> sin numero fijo; "implementacion completa de multiples proveedores LLM" nunca fue el objetivo perseguido, se corrigio la afirmacion ademas del numero).
+- `README.md`: "Estado actual" actualizado de V0.9 a V1.0 (Production Readiness); resumen de Roadmap actualizado.
+- `docs/13-Versionado.md`: nueva seccion "V0.9.0 -> V1.0.0" documentando la auditoria de Fase 1 (build/instalacion limpia/reproducibilidad verificados) y las correcciones documentales de Fase 3.
+
+### Scope
+
+- **Release de estabilizacion, no un ciclo de funcionalidades nuevas** (Scope Lock explicito de `prompts/V1.0—PRODUCTION-READINESS.md`). Cero cambios en `analyzer/`, `generators/`, `validator/`, `cli/`, `providers/`, `ai/` ni `skills/spring-doc/SKILL.md` -- verificado por `git diff --stat` (solo archivos `.md`/`pyproject.toml`/`CHANGELOG.md`) y por la suite completa, que permanece en 482 tests sin cambios.
+- No se implemento CI/CD, nuevos providers, nuevos comandos de CLI, ni ninguna de las funcionalidades explicitamente excluidas por la seccion 23 de la directriz (RAG, embeddings, agentes, Confluence, Auditor, Drift Detection, Quality Gate, web UI, Docker, cloud, autenticacion, etc.).
+- Auditoria de Fase 1 (solo inspeccion, sin modificar archivos) confirmo: `python -m build` produce sdist+wheel limpiamente; instalacion no editable desde el wheel, en un venv nuevo y un directorio ajeno al repositorio, ejecuta la CLI y el flujo completo `analyze --openapi -> validate` contra `examples/customer-service` sin errores; los artefactos de ejemplo son reproducibles (JSON exacto, YAML con el cuerpo exacto); no hay secretos reales en el repositorio; cada paquete ya declaraba `__all__` explicito.
+- **No entraron en V1.0** (registrados como mejora futura, categoria D de la auditoria): empaquetar `skills/spring-doc/SKILL.md` como data file distribuible via `pip`; comando exacto reproducible en `examples/README.md`; tests de permisos de lectura para `analyze`/`generate` (asimetria con `validate`, que ya los tiene desde V0.6); verificacion de compatibilidad real contra Python 3.11; `classifiers`/`authors`/URL de repositorio en `pyproject.toml`; CI/CD.
+
 ## [0.9.0] - 2026-08-14
 
 ### Added

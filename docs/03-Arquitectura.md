@@ -96,14 +96,19 @@ por componente mas abajo).
   - `analyzer/__init__.py::analyze_project` — orquesta ambos motores.
 - Detalle en `docs/07-Analisis.md`.
 
-### Skill (estructura definida en V0.1)
+### Skill (diseño conceptual de V0.1, nunca implementado como codigo ejecutable)
 
-- **Responsabilidad:** encapsular el conocimiento sobre como documentar APIs correctamente:
-  reglas, principios, formato OpenAPI, manejo de incertidumbre.
-- **Entrada:** evidencia/metadata producida por el Analyzer.
-- **Salida:** instrucciones/comportamiento esperado para el LLM Provider.
-- **Dependencias:** consume la salida del Analyzer; no depende de ningun LLM concreto.
-- Detalle en `docs/04-Skill.md`.
+- **Responsabilidad (diseño original):** encapsular el conocimiento sobre como documentar APIs
+  correctamente: reglas, principios, formato OpenAPI, manejo de incertidumbre.
+- **Entrada (diseño original):** evidencia/metadata producida por el Analyzer.
+- **Salida (diseño original):** instrucciones/comportamiento esperado para el LLM Provider.
+- **Dependencias (diseño original):** consume la salida del Analyzer; no depende de ningun LLM
+  concreto.
+- **Estado real (V1.0):** este diseño nunca se conecto a codigo -- ningun componente del
+  repositorio carga o invoca `skill/SKILL.md`. El artefacto que si funciona end-to-end es
+  `skills/spring-doc/SKILL.md` (ver mas abajo), con un diseño deliberadamente distinto (lee codigo
+  fuente Java directamente, sin Analyzer de por medio). Ver `docs/04-Skill.md` para la resolucion
+  completa de esta diferencia.
 
 ### LLM Provider (interfaz definida en V0.1, infraestructura V0.6, primer provider real en V0.7)
 
@@ -374,6 +379,12 @@ estaban) ni `generators/` (el Validator consume el `dict` de salida, no llama a 
   proveedor especifico directamente.
 - `validators/` (placeholder, sin uso desde V0.1) existe como paquete reservado sin logica de
   negocio. `generators/` (V0.3) y `validator/` (V0.4) ya tienen implementacion real.
+- **Decision explicita (V1.0):** la auditoria de Production Readiness confirmo por busqueda en
+  todo el repositorio que `validators/` sigue sin ninguna referencia real (ni import, ni mencion
+  fuera de su propio placeholder y de esta documentacion). Se mantiene como paquete historico/
+  reservado -- no se elimina, siguiendo la gobernanza ya establecida en `CLAUDE.md` ("Nota de
+  nomenclatura permanente"). Cualquier decision de eliminarlo o darle uso real requiere
+  autorizacion explicita separada, no se toma por omision.
 - Dentro del Analyzer (V0.2): unicamente `analyzer/ast_backend.py` importa `javalang`. Los demas
   modulos (`ast_analyzer.py`, `dto_analyzer.py`, `__init__.py`) solo conocen el resultado de sus
   utilidades (texto, dicts, nodos ya normalizados via `annotation_args`/`literal_text`/

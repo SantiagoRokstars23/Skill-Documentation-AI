@@ -1,10 +1,12 @@
 # 09 — Auditoria
 
-> El Auditor como componente **no** esta implementado (reservado para V0.4, ver
-> `docs/12-Roadmap.md`). Este documento define el vocabulario y las bases conceptuales, y describe
-> que soporte deja preparado el Analyzer (V0.1 y V0.2) para esta fase futura: evidencia
-> estructurada (`Evidence`) y diagnostics (`Diagnostic`), ambos ya implementados como parte del
-> Analyzer, no del Auditor.
+> El Auditor como componente **no** esta implementado y **no tiene version de roadmap asignada
+> todavia** (el roadmap original lo agrupaba con el Validator en V0.4; la directriz real de V0.4
+> acoto el alcance unicamente al OpenAPI Quality Validator, y el Auditor quedo pendiente de una
+> futura directriz -- ver la nota correspondiente en `docs/12-Roadmap.md`). Este documento define
+> el vocabulario y las bases conceptuales, y describe que soporte deja preparado el Analyzer
+> (V0.1 y V0.2) para esta fase futura: evidencia estructurada (`Evidence`) y diagnostics
+> (`Diagnostic`), ambos ya implementados como parte del Analyzer, no del Auditor.
 
 ## Trazabilidad
 

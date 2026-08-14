@@ -38,15 +38,23 @@ Ver criterios de aceptacion detallados en `prompts/V0.1-foundation.md` seccion 2
 
 ## Objetivos futuros (fuera de V0.1)
 
+> Nota: las asignaciones de version de esta lista corresponden al roadmap original de V0.1. Varias
+> se reprogramaron durante el desarrollo real del proyecto; ver `docs/12-Roadmap.md` para las
+> reasignaciones documentadas y el estado actual de cada una.
+
 - Generacion completa de especificaciones OpenAPI (V0.3).
-- Validacion y auditoria deterministica de documentacion (V0.4).
-- Implementacion completa de multiples proveedores LLM (V0.5).
-- CLI del proyecto (V0.6).
-- Integracion con Confluence (V0.7).
+- Validacion deterministica de documentacion OpenAPI (V0.4 acoto el alcance original de este punto
+  al OpenAPI Quality Validator; la auditoria de trazabilidad/confidence quedo sin version
+  asignada).
+- CLI del proyecto (V0.5; el roadmap original la ubicaba en V0.6).
+- Infraestructura de LLM Providers y primer provider real (V0.6/V0.7; "implementacion completa de
+  multiples proveedores LLM" no fue el objetivo perseguido -- se prioriza un unico provider
+  comercial real mas la abstraccion intercambiable).
+- Integracion con Confluence (originalmente V0.7; reprogramada sin numero de version fijo).
 - Deteccion de divergencias (drift) entre codigo y documentacion (V3.0).
 - Quality Gate de documentacion (V2.0).
 
-Ver `docs/12-Roadmap.md` para el detalle completo.
+Ver `docs/12-Roadmap.md` para el detalle completo y las reasignaciones de version.
 
 ## Funcionalidades fuera de alcance (V0.1)
 

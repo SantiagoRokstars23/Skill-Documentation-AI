@@ -17,21 +17,23 @@ Reducir ese problema mediante automatizacion, analisis estatico deterministico d
 capacidades de LLM controladas por una Skill especializada, manteniendo el sistema independiente
 de cualquier proveedor de LLM concreto. Ver `docs/02-Objetivos.md`.
 
-## Estado actual — V0.9 (Skill + End-to-End Documentation)
+## Estado actual — V1.0 (Production Readiness)
 
-**Funcional: el Analyzer, el OpenAPI Generator, el OpenAPI Quality Validator, la CLI
+**Funcional y estable: el Analyzer, el OpenAPI Generator, el OpenAPI Quality Validator, la CLI
 (`spring-doc`), la infraestructura de LLM Providers** (configuracion, errores, seleccion por
 nombre, `FakeProvider` determinista, `AnthropicProvider` real via stdlib sin SDK), **la capa AI**
-(`ai/`: `DocumentationContextBuilder` + `DocumentationPromptBuilder` + `DocumentationEngine`,
-generando documentacion tecnica basada exclusivamente en la evidencia del Analyzer, mas
-`ai/enrichment.py::apply_documentation`, V0.9, que aplica esa documentacion sobre un documento
-OpenAPI ya generado) **y la Skill de documentacion** (`skills/spring-doc/SKILL.md`, con un modo
-por defecto LLM/agente/motor-agnostico sin cambios desde V0.6/V0.7, mas una seccion opcional
-nueva en V0.9 que describe la orquestacion end-to-end del motor `spring-doc`). **Sin comandos de
-CLI nuevos** (la orquestacion end-to-end es un proceso documentado para que un agente lo ejecute,
-no una funcionalidad nueva de `cli/`) **ni cambios en Analyzer/Generator/Validator/providers**
-(ninguno fue modificado). El Auditor y las integraciones (Confluence) permanecen definidos y
-documentados, pero no implementados. Ver `docs/12-Roadmap.md`.
+(`ai/`: `DocumentationContextBuilder` + `DocumentationPromptBuilder` + `DocumentationEngine` +
+`ai/enrichment.py::apply_documentation`, que aplica documentacion generada por un LLM sobre un
+documento OpenAPI ya construido) **y la Skill de documentacion** (`skills/spring-doc/SKILL.md`,
+con un modo por defecto LLM/agente/motor-agnostico mas una seccion opcional que describe la
+orquestacion end-to-end del motor `spring-doc`). V1.0 es un release de estabilizacion (sin cambios
+funcionales en ningun paquete respecto a V0.9): verifico empaquetado (`python -m build` produce
+sdist+wheel), instalacion limpia real (venv nuevo, wheel no editable, ejecutado fuera del
+repositorio) y reproducibilidad del ejemplo incluido; ademas documento explicitamente la API
+publica (ver mas abajo) y resolvio deuda documental heredada (ver `docs/13-Versionado.md` seccion
+"V0.9.0 -> V1.0.0"). **Sin comandos de CLI nuevos, sin nuevos providers, sin CI/CD.** El Auditor y
+las integraciones (Confluence) permanecen definidos y documentados, pero no implementados. Ver
+`docs/12-Roadmap.md`.
 
 Funcionalidad disponible hoy:
 
@@ -202,6 +204,30 @@ for diagnostic in validate(document):
     print(diagnostic.severity.value, diagnostic.code, diagnostic.message)
 ```
 
+### API publica (V1.0)
+
+El contrato estable de cada paquete es exactamente lo que declara en su `__all__` de nivel
+superior -- nada mas. Import recomendado: siempre desde el paquete, nunca desde un submodulo
+interno.
+
+| Paquete | Import publico (`__all__`) |
+|---|---|
+| `analyzer` | `analyze_project`, `analyze_file`, `discover_java_files`, `AnalysisResult`, `Controller`, `Endpoint`, `Parameter`, `ParameterSource`, `HttpMethod`, `DTO`, `Field`, `Response`, `Validation`, `Diagnostic`, `DiagnosticSeverity`, `Evidence` |
+| `generators` | `generate`, `to_json`, `to_yaml`, `OPENAPI_VERSION` |
+| `validator` | `validate`, `validate_json`, `validate_yaml` |
+| `providers` | `LLMProvider`, `ProviderConfig`, `get_provider`, `FakeProvider`, `AnthropicProvider`, `LLMProviderError` y sus 6 subclases (`ProviderNotConfiguredError`, `UnknownProviderError`, `MissingCredentialError`, `InvalidModelError`, `ProviderTimeoutError`, `ProviderRequestError`, `InvalidResponseError`) |
+| `ai` | `DocumentationContextBuilder`, `DocumentationPromptBuilder`, `DocumentationEngine`, `apply_documentation`, `DocumentationContext`, `DocumentationResult` y sus dataclasses (`EndpointContext`, `ParameterContext`, `DTOContext`, `DTOFieldContext`, `ResponseContext`, `EndpointDocumentation`, `ParameterDocumentation`, `DTODocumentation`, `ResponseDocumentation`), `DocumentationError`, `DocumentationParseError`, `PROMPT_VERSION` |
+| `cli` | uso previsto via el entry point instalado `spring-doc` (o `python -m cli`), no como libreria importable |
+
+**Internos, no importar directamente** (pueden cambiar sin aviso, incluso dentro de la misma
+version): `analyzer.ast_analyzer`, `analyzer.ast_backend`, `analyzer.dto_analyzer`,
+`analyzer.spring_boot_analyzer`, `analyzer.scanner`; `generators.openapi_types`,
+`generators.openapi_schemas`, `generators.openapi_generator`; `validator.openapi_rules`,
+`validator.openapi_validator`; `providers.base`, `providers.config`, `providers.errors`,
+`providers.fake`, `providers.anthropic`, `providers.registry`; `ai.models`, `ai.context`,
+`ai.prompts`, `ai.parsing`, `ai.errors`, `ai.documentation`, `ai.enrichment`; todo `cli.*` como
+modulo (`cli.main`, `cli.commands`, `cli.output`, `cli.errors`).
+
 ## Capa AI (`ai/`)
 
 Genera documentacion tecnica con un LLM a partir de un `AnalysisResult`, sin invocar la CLI ni
@@ -322,14 +348,16 @@ fallback (sintaxis Java invalida a proposito). Ver `examples/README.md`.
 
 ## Roadmap
 
-Ver `docs/12-Roadmap.md`. Resumen: V1.0 Production, V2.0 Documentation Quality Gate, V3.0 Drift
-Detection. (El Auditor, originalmente agrupado con el Validator en V0.4, queda sin version
-asignada; LLM Providers, originalmente V0.5, se reprogramo sin numero fijo cuando V0.5 se reasigno
-a CLI & Developer Experience, y V0.6 lo retomo con directriz propia; Confluence Integration,
-originalmente V0.7, se reprogramo sin numero fijo cuando V0.7 se reasigno a LLM Real Provider &
-AI Foundation. V0.9 conecta `ai/` con un documento OpenAPI ya generado -- `apply_documentation` --
-y evoluciona la Skill con una seccion opcional de orquestacion end-to-end del motor `spring-doc`,
-sin agregar comandos de CLI.)
+Ver `docs/12-Roadmap.md`. Resumen: V1.0 Production Readiness (release de estabilizacion, sin
+funcionalidades nuevas), V2.0 Documentation Quality Gate, V3.0 Drift Detection. (El Auditor,
+originalmente agrupado con el Validator en V0.4, queda sin version asignada; LLM Providers,
+originalmente V0.5, se reprogramo sin numero fijo cuando V0.5 se reasigno a CLI & Developer
+Experience, y V0.6 lo retomo con directriz propia; Confluence Integration, originalmente V0.7, se
+reprogramo sin numero fijo cuando V0.7 se reasigno a LLM Real Provider & AI Foundation. V0.9
+conecto `ai/` con un documento OpenAPI ya generado -- `apply_documentation` -- y evoluciono la
+Skill con una seccion opcional de orquestacion end-to-end del motor `spring-doc`. V1.0 verifica
+empaquetado/instalacion limpia, documenta la API publica y resuelve deuda documental heredada,
+sin cambios funcionales en ningun paquete.)
 
 ## Futuras integraciones
 

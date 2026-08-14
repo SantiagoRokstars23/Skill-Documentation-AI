@@ -457,3 +457,74 @@ una corrida separada sin mutar, paths/operaciones preservados exactamente), y ac
 encabezado de la seccion opcional, verificacion de que la seccion opcional SI referencia la CLI y
 la API publica del motor, de que se declara explicitamente opcional con fallback documentado, y de
 que nunca nombra un LLM/proveedor concreto en ninguno de los dos modos).
+
+### V0.9.0 -> V1.0.0
+
+**Sin cambios funcionales en ningun paquete.** V1.0 (Production Readiness) es un release de
+estabilizacion, no un nuevo ciclo de funcionalidades (Scope Lock explicito de
+`prompts/V1.0—PRODUCTION-READINESS.md`, seccion 2). `analyzer/`, `generators/`, `validator/`,
+`cli/`, `providers/`, `ai/` y `skills/spring-doc/SKILL.md` no se modificaron -- verificado por
+`git diff --stat` (7 archivos, todos `.md`/`pyproject.toml`/`CHANGELOG.md`, cero archivos `.py`)
+y por la suite completa, que permanece en 482 tests sin cambios.
+
+**Auditoria de Fase 1 (inspeccion, sin modificar archivos) confirmo el estado real del proyecto**
+antes de cualquier cambio:
+
+- `python -m build` (hatchling) produce sdist + wheel limpiamente; el wheel contiene los 7
+  paquetes declarados, el entry point `spring-doc`, `LICENSE` y `METADATA` -- nada de mas, nada de
+  menos.
+- **Instalacion limpia probada de verdad:** un venv nuevo, instalacion no editable unicamente
+  desde el wheel construido (dependencias resueltas contra PyPI), ejecutado desde un directorio
+  ajeno al repositorio. `spring-doc --version`, `--help`, y el flujo completo `analyze --openapi
+  -> validate` contra `examples/customer-service` (referenciado por ruta absoluta) funcionan sin
+  ningun error, exit code 0. Sin dependencia oculta de rutas relativas al repositorio ni del
+  working directory.
+- `examples/customer-service/openapi.json` reproducible byte a byte. `openapi.yaml` reproducible
+  en el cuerpo completo; solo difiere un comentario de cabecera de 2 lineas escrito a mano que
+  `to_yaml()` nunca produjo (cosmetico, no funcional, verificado comparando cuerpos).
+- Sin secretos reales en el repositorio (`git grep` sobre todos los archivos trackeados): los
+  unicos valores que matchean patrones de credencial son ficticios y estan claramente rotulados
+  (`"sk-ant-fake-test-key-never-real"`, `"super-secret-value"`) en `tests/test_providers_*.py`.
+- Cada paquete (`analyzer`/`generators`/`validator`/`providers`/`ai`) ya declaraba `__all__`
+  explicito -- el limite publico/interno ya existia en codigo, solo faltaba documentarse como tal.
+- `.github/` no existe: confirmado que no hay CI/CD configurado (fuera de alcance de V1.0 por la
+  propia directriz, seccion 19 -- se documenta como trabajo futuro, no se implementa).
+
+**Correcciones documentales aplicadas (Fase 3), todas C -- documentacion incorrecta, codigo ya
+correcto:**
+
+- `docs/12-Roadmap.md`: fila de V0.9 corregida de `Completada / esta version` (residuo de antes
+  de tagear `v0.9.0`) a `Completada (\`v0.9.0\`)`; V1.0 renombrada de "Production" a "Production
+  Readiness"; bullet completo agregado con el resultado real de la auditoria de Fase 1.
+- `docs/09-Auditoria.md`: corregida la referencia a "reservado para V0.4" (desactualizada desde
+  hace 6 versiones -- V0.4 se reasigno al Validator; el Auditor quedo sin numero de version
+  asignado).
+- `docs/11-Integracion.md`: corregida la referencia a "futura, V0.7" (desactualizada desde hace 3
+  versiones -- V0.7 se reasigno a LLM Real Provider; Confluence quedo sin numero de version fijo).
+- `docs/02-Objetivos.md`: corregidas las asignaciones de version obsoletas en "Objetivos futuros"
+  (CLI listada como V0.6 quedo en V0.5; Confluence como V0.7 quedo sin numero fijo; "implementacion
+  completa de multiples proveedores LLM" nunca fue el objetivo perseguido -- se corrigio la
+  afirmacion, no solo el numero).
+- `docs/04-Skill.md`: bloque de estado nuevo que resuelve explicitamente la diferencia historica
+  entre `skill/` (diseño conceptual de V0.1, **nunca implementado como codigo ejecutable** -- cero
+  consumidores reales en todo el repositorio, verificado con `git grep` sobre todos los `.py`
+  trackeados: la unica mencion de `skill/` fuera de este documento esta en un comentario de
+  `tests/test_ai_isolation.py`, no como dependencia real) y `skills/spring-doc/SKILL.md` (el
+  artefacto que si funciona end-to-end desde V0.6, evolucionado en V0.9). `skill/` se conserva
+  como pieza historica, no se elimina.
+- `docs/03-Arquitectura.md`: cross-reference agregado en la seccion "Skill" apuntando a la
+  resolucion de `docs/04-Skill.md`; decision explicita registrada sobre `validators/` (confirmado
+  sin ninguna referencia real en el repositorio; se mantiene como paquete historico/reservado por
+  la gobernanza ya establecida en `CLAUDE.md`, no se elimina sin autorizacion separada).
+- `README.md`: nueva seccion "API publica" derivada 1:1 de los `__all__` reales de cada paquete
+  (verificado programaticamente contra el codigo, cero discrepancias); "Estado actual" actualizado
+  de V0.9 a V1.0.
+
+**Ninguna dependencia nueva**, runtime ni dev. **Ningun comando de CLI nuevo.** **Ningun provider
+nuevo.** **Sin CI/CD.**
+
+0 tests nuevos (482 sin cambios): el alcance completo de V1.0 es documental, sin comportamiento
+nuevo que proteger con un test. Se reconfirmo la suite completa despues de cada cambio y se repitio
+manualmente la verificacion de `python -m build` + instalacion limpia (no se convirtio en test
+automatizado permanente -- fuera del alcance autorizado para V1.0, queda registrado como mejora
+futura).
