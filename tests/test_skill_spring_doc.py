@@ -157,4 +157,37 @@ def test_skill_is_reasonably_self_contained_markdown():
     # No debe referenciar rutas de documentacion internas del repositorio como
     # si fueran necesarias para entender la skill (debe ser copiable sola).
     assert "docs/" not in text
+
+
+def test_skill_requires_tracing_error_responses_not_just_success():
+    text = _read_skill_text().lower()
+    assert "error response" in text
+    assert "only the success response" in text or "not just" in text or (
+        "success path" in text
+    )
+
+
+def test_skill_requires_tags_and_summary_on_every_operation():
+    text = _read_skill_text().lower()
+    assert "tags" in text
+    assert "summary" in text
+
+
+def test_skill_distinguishes_fixed_vs_dynamic_catalog_fields():
+    text = _read_skill_text().lower()
+    assert "catalog" in text
+    assert "hardcod" in text  # cubre "hardcode"/"hardcoding" en ambos casos
+
+
+def test_skill_requires_field_level_descriptions_on_both_request_and_response():
+    text = _read_skill_text().lower()
+    assert "give every field a description" in text
+    assert "response" in text and "request" in text
+
+
+def test_skill_requires_verifying_security_is_actually_enforced():
+    text = _read_skill_text().lower()
+    assert "not currently enforced" in text or "not actually enforced" in text or (
+        "disabled" in text
+    )
     assert "prompts/" not in text

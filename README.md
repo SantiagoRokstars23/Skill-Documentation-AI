@@ -192,9 +192,12 @@ for diagnostic in validate(document):
 `skills/spring-doc/SKILL.md` es un documento de conocimiento independiente — LLM-agnostico,
 agente-agnostico y no ligado a `spring-doc` ni a ningun otro componente de este proyecto — que
 ensena a un LLM como documentar el API HTTP de un microservicio Java/Spring Boot leyendo su
-codigo fuente directamente: que buscar (controllers, mappings, parametros, DTOs, respuestas,
-seguridad), como tratar la ambiguedad y la informacion faltante sin inventar, y como estructurar
-el resultado. Se puede copiar como un `.md` suelto y entregarse, junto con el codigo fuente de un
+codigo fuente directamente: que buscar (controllers, mappings, parametros, DTOs, respuestas
+-incluyendo el trazado de errores desde las excepciones que el codigo realmente lanza, no solo el
+camino de exito-, seguridad -verificando que este realmente activa antes de documentarla-,
+`tags`/`summary`/`description`, y campos "codigo de catalogo" fijos vs. dinamicos), como tratar la
+ambiguedad y la informacion faltante sin inventar, y como estructurar el resultado. Se puede copiar
+como un `.md` suelto y entregarse, junto con el codigo fuente de un
 proyecto Spring Boot, a cualquier LLM. No requiere `spring-doc` ni ninguna otra herramienta; puede
 mencionarla como opcion, nunca como requisito. No debe confundirse con `skill/` (singular, V0.1),
 el componente conceptual de la arquitectura del producto — ver `docs/03-Arquitectura.md`.

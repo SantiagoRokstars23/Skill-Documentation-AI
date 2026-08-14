@@ -177,12 +177,31 @@ V0.1): este ultimo es el componente conceptual de la arquitectura del producto
 Analyzer de por medio, y no forma parte del pipeline `Analyzer -> Skill -> LLM Provider ->
 Generator -> Validator -> Auditor`. Ambos coexisten sin relacion entre si.
 
-39 tests nuevos (308 -> 347): `ProviderConfig` (construccion, `from_env`, inmutabilidad, `api_key`
+**Ampliacion de completitud OpenAPI en la SKILL (dentro de la misma V0.6, antes del tag):** a
+pedido explicito del responsable del proyecto, `skills/spring-doc/SKILL.md` se profundizo para
+cubrir de forma explicita todo lo que un consumidor de un spec OpenAPI generado a partir de ella
+necesitaria para no encontrar huecos: trazado de respuestas de error a partir de las excepciones
+que el codigo realmente lanza (metodo + llamadas a metodos privados/protegidos y colaboradores
+inyectados, mas el fallback de un manejador global si existe) en vez de documentar solo la
+respuesta de exito; `tags`/`summary` obligatorios y `description` cuando la operacion tiene logica
+real; descripcion y ejemplo por cada campo de DTO tanto en request como en response (evitando la
+asimetria tipica donde el request queda mejor documentado que el response); distincion explicita
+entre campos "codigo de catalogo" de valores fijos en el codigo (documentables directamente) y de
+valores dinamicos/externos (nunca hardcodear valores que pueden quedar desactualizados; documentar
+donde consultarlos); verificacion de que un requisito de seguridad este realmente activo en el
+codigo (no comentado/deshabilitado) antes de documentarlo como tal; mencion de URLs reales por
+ambiente a nivel de proyecto si el codigo las declara. La regla de evidencia no cambio -- esto es
+mas exhaustividad sobre que capturar, no una relajacion de "nunca inventar". Sigue sin depender de
+`spring-doc`, sin mencionar ninguna herramienta externa especifica de terceros, y sin describir la
+arquitectura interna de este proyecto.
+
+44 tests nuevos (308 -> 352): `ProviderConfig` (construccion, `from_env`, inmutabilidad, `api_key`
 nunca en `repr`/`str`), jerarquia de errores, `FakeProvider` (determinismo, contrato), registro
 (resolucion por nombre, provider desconocido, sin configurar), aislamiento (Analyzer/Generator/
 Validator/CLI funcionan sin ninguna variable `SPRING_DOC_LLM_*`, y ninguno de esos paquetes
 importa `providers`), validaciones sobre `skills/spring-doc/SKILL.md` (frontmatter valido, no
 referencia la arquitectura interna del proyecto ni sintaxis de la CLI, no se dirige a un
 agente/proveedor concreto, menciones de `spring-doc` -si las hay- quedan enmarcadas como
-opcionales, ensena los principios de evidencia esperados, y es autocontenido), y la regresion de
-`cli/commands.py::run_validate` sobre archivos no-UTF-8/no legibles (ver mas arriba).
+opcionales, ensena los principios de evidencia esperados y la cobertura de completitud OpenAPI
+descrita arriba, y es autocontenido), y la regresion de `cli/commands.py::run_validate` sobre
+archivos no-UTF-8/no legibles (ver mas arriba).
