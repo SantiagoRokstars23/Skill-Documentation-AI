@@ -8,13 +8,20 @@ completarse (criterios de aceptacion + Definition of Done) antes de iniciar la s
 | V0.1 | Foundation & Architecture | Completada (`v0.1.0`) |
 | V0.2 | Spring Boot Analyzer (Advanced) | Completada (`v0.2.0`) |
 | V0.3 | OpenAPI Generator | Completada (`v0.3.0`) |
-| V0.4 | OpenAPI Quality Validator | **Completada / esta version** |
-| V0.5 | LLM Providers | Futuro |
-| V0.6 | CLI | Futuro |
+| V0.4 | OpenAPI Quality Validator | Completada (`v0.4.0`) |
+| V0.5 | CLI & Developer Experience | **Completada / esta version** |
 | V0.7 | Confluence Integration | Futuro |
 | V1.0 | Production | Futuro |
 | V2.0 | Documentation Quality Gate | Futuro |
 | V3.0 | Drift Detection | Futuro |
+| — | LLM Providers | Futuro, sin numero de version asignado (ver nota mas abajo) |
+
+**Nota (V0.5):** el roadmap original asignaba V0.5 a "LLM Providers" y V0.6 a "CLI". La
+directriz real recibida para V0.5 (`prompts/V0.5—CLI-&-DEVELOPER-EXPERIENCE.md`) prioriza la CLI,
+confirmada explicitamente por el responsable del proyecto. "LLM Providers" se reprograma para una
+version futura sin numero fijo todavia, para no forzar la numeracion antigua; se decidira su
+posicion exacta en el roadmap cuando se aborde. "CLI" deja de tener su propio hueco en V0.6 porque
+ya se implemento aqui, en V0.5.
 
 ## Resumen por version
 
@@ -41,9 +48,13 @@ completarse (criterios de aceptacion + Definition of Done) antes de iniciar la s
   roadmap original agrupaba "Validator + Auditor" en V0.4; la directriz real de V0.4 acoto el
   alcance unicamente al Validator de OpenAPI — la Auditoria de trazabilidad/confidence permanece
   sin version asignada, pendiente de una futura directriz.
-- **V0.5 — LLM Providers:** implementaciones concretas de la interfaz `LLMProvider` (Claude,
-  Gemini, OpenAI u otros).
-- **V0.6 — CLI:** herramienta de linea de comandos que expone el pipeline completo.
+- **V0.5 — CLI & Developer Experience:** herramienta de linea de comandos (`spring-doc`) que
+  orquesta Analyzer -> Generator -> Validator mediante sus APIs publicas (`analyze`, `generate`,
+  `validate`), con salida humana y `--json` (reporte estructurado, independiente del `--format`
+  del artefacto OpenAPI), exit codes deterministas, `--strict`/`--quiet`, y manejo de errores de
+  usuario vs. errores internos. Ver `prompts/V0.5—CLI-&-DEVELOPER-EXPERIENCE.md` y
+  `docs/03-Arquitectura.md`. No implementa ningun proveedor LLM (movido fuera de esta version, ver
+  nota de la tabla de arriba).
 - **V0.7 — Confluence Integration:** conexion de la salida OpenAPI con el proyecto Python
   existente que publica en Confluence.
 - **V1.0 — Production:** endurecimiento, empaquetado y estabilizacion para uso en produccion.

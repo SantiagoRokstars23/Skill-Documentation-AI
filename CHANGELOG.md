@@ -5,6 +5,31 @@ Todos los cambios relevantes de este proyecto se documentan en este archivo.
 El formato sigue las convenciones de [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y este proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 
+## [0.5.0] - 2026-08-14
+
+### Added
+
+- CLI (`cli/`): comando instalable `spring-doc` (`[project.scripts]`, tambien invocable como `python -m cli`) que orquesta `analyzer` -> `generators` -> `validator` mediante sus APIs publicas, sin reimplementar analisis, generacion ni validacion.
+- Tres subcomandos: `spring-doc analyze <project>` (con `--openapi` para ademas generar y validar el OpenAPI, ejecutando Analyzer -> Generator -> Validator en una sola invocacion), `spring-doc generate <project>` (Analyzer -> Generator), `spring-doc validate <openapi-file>` (Validator, independiente).
+- `cli/main.py`: parser `argparse` (stdlib, sin dependencias nuevas), `--version`, exit codes deterministas (`0` exito, `1` diagnostics que fallan el run, `2` error de uso, `3` error interno inesperado sin traceback).
+- `cli/commands.py`: orquestacion y calculo de `status`/conteos por severidad; `--strict` hace que los `WARNING` tambien fallen el run (ademas de los `ERROR`, que siempre fallan); conteo de DTOs distintos (incluyendo anidados) derivado de la API publica existente, sin modificar `analyzer/models.py`.
+- `cli/output.py`: dos formatos de salida independientes y explicitamente separados — `--format json|yaml` controla el **artefacto** OpenAPI generado; `--json` controla el **reporte** de la CLI sobre la operacion (conteos por severidad y, cuando aplica, la ruta del artefacto bajo `outputs`). El reporte `--json` nunca incluye el documento OpenAPI embebido. Combinar `--json` con generacion de OpenAPI sin `--output` es un error de uso (el reporte y el documento no pueden compartir stdout).
+- `--quiet` suprime el resumen humano solo cuando el resultado es `ok` (un fallo causado por `--strict` sigue mostrando el detalle, para no ocultar por que fallo).
+- `--output` crea directorios padres faltantes automaticamente; sigue siendo error de uso si el destino no es escribible (p. ej. apunta a un directorio existente).
+- `cli/errors.py`: `CliUsageError`, unica excepcion propia de la CLI, distingue errores de entrada del usuario (exit 2) de errores internos inesperados (exit 3, capturados en el punto de entrada).
+- 47 tests nuevos (260 -> 307): parser (help/version/comando desconocido/argumentos invalidos), cada comando, exit codes, `--strict`/`--quiet`/`--json`, separacion `--format`/`--json`, `--openapi`, escritura a archivo, integracion real contra `examples/customer-service`, determinismo, portabilidad de rutas (`pathlib`/`tmp_path`), y verificacion por grep de que `cli/` no importa modulos internos de Analyzer/Generator/Validator ni `javalang`.
+
+### Changed
+
+- `pyproject.toml`: version `0.4.0` -> `0.5.0`; se agrega `cli` a `tool.hatch.build.targets.wheel.packages` y `[project.scripts]` con el entry point `spring-doc`. Ninguna dependencia de runtime nueva (`argparse` es libreria estandar).
+- `docs/12-Roadmap.md`, `docs/13-Versionado.md`, `docs/03-Arquitectura.md`, `README.md`: actualizados para reflejar la CLI implementada.
+
+### Scope
+
+- No se implemento ningun proveedor LLM, RAG, MCP, agentes, Confluence, CI/CD, Docker, API HTTP, Swagger UI, generacion de SDK/clientes/servidores, base de datos, interfaz grafica, autenticacion, cloud, Auditor avanzado, ni Drift Detection. Ver `docs/12-Roadmap.md`.
+- `analyzer/`, `generators/` y `validator/` no se modificaron: los 260 tests previos a V0.5 no se modificaron y continuan pasando.
+- **Reasignacion de version autorizada explicitamente:** el roadmap original asignaba V0.5 a "LLM Providers" y V0.6 a "CLI". La directriz real de V0.5 prioriza la CLI; "LLM Providers" se reprograma sin numero de version fijo (ver `docs/12-Roadmap.md`).
+
 ## [0.4.0] - 2026-08-13
 
 ### Added

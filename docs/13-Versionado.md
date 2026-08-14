@@ -81,3 +81,34 @@ validacion OpenAPI externa (Scope Lock V0.4).
 V0.1 para un futuro "Validator", **no** es el paquete que implementa V0.4 — la directriz real
 nombro el paquete nuevo `validator/` (singular). `validators/` permanece intacto, sin uso, sin
 eliminarse (ver `docs/03-Arquitectura.md`).
+
+### V0.4.0 -> V0.5.0
+
+**Sin cambios en `analyzer/`, `generators/` ni `validator/`.** V0.5 (CLI & Developer Experience)
+no modifico ningun archivo de los tres paquetes: solo los importa a traves de sus APIs publicas
+(`analyze_project`, `generate`/`to_json`/`to_yaml`, `validate`/`validate_json`/`validate_yaml`).
+Los 260 tests previos a V0.5 permanecen sin modificar.
+
+Se agrega el paquete `cli/` (nuevo, funcional desde su creacion): `cli/main.py` (parser
+`argparse` y despacho), `cli/commands.py` (orquestacion `analyze`/`generate`/`validate`),
+`cli/output.py` (formato humano y `--json`), `cli/errors.py` (`CliUsageError`). Entry point nuevo
+`spring-doc` (`[project.scripts]` en `pyproject.toml`, tambien invocable como `python -m cli`).
+Ninguna dependencia de runtime nueva: `argparse` es libreria estandar (decision de Fase 2,
+priorizando minima dependencia sobre `click`/`typer`).
+
+**Reasignacion de numero de version (autorizada explicitamente):** el roadmap original asignaba
+V0.5 a "LLM Providers" y V0.6 a "CLI". La directriz real de V0.5 prioriza la CLI; "LLM Providers"
+se reprograma sin numero de version fijo (ver `docs/12-Roadmap.md`).
+
+**Decision de diseno explicita de esta version:** `--format json|yaml` y `--json` no son la misma
+opcion. `--format` determina el formato del artefacto OpenAPI (`generate`/`analyze --openapi`);
+`--json` determina el formato del reporte de la CLI sobre la operacion (conteos y diagnostics por
+severidad), nunca el documento OpenAPI embebido. Cuando `--json` se combina con generacion de
+OpenAPI, `--output` es obligatorio (el reporte JSON y el documento no pueden compartir stdout).
+
+47 tests nuevos (260 -> 307) cubriendo parser (help/version/comando desconocido/argumentos invalidos), cada comando, exit
+codes, `--strict`/`--quiet`/`--json`, separacion `--format`/`--json`, `--openapi`, escritura a
+archivo, integracion real contra `examples/customer-service`, determinismo, portabilidad de rutas
+(`pathlib`/`tmp_path`), y el limite arquitectonico de la CLI (verificado por grep sobre `cli/*.py`:
+sin referencias a `ast_analyzer`, `ast_backend`, `dto_analyzer`, `spring_boot_analyzer`,
+`analyzer.scanner`, `openapi_types`, `openapi_schemas`, `openapi_rules` ni `javalang`).

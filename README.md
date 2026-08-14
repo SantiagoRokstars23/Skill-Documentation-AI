@@ -17,11 +17,12 @@ Reducir ese problema mediante automatizacion, analisis estatico deterministico d
 capacidades de LLM controladas por una Skill especializada, manteniendo el sistema independiente
 de cualquier proveedor de LLM concreto. Ver `docs/02-Objetivos.md`.
 
-## Estado actual — V0.4 (OpenAPI Quality Validator)
+## Estado actual — V0.5 (CLI & Developer Experience)
 
-**Funcional: el Analyzer, el OpenAPI Generator y el OpenAPI Quality Validator.** El resto de
-componentes (Skill como motor ejecutable, LLM Provider concreto, Auditor, CLI, integraciones)
-estan definidos y documentados, pero no implementados. Ver `docs/12-Roadmap.md`.
+**Funcional: el Analyzer, el OpenAPI Generator, el OpenAPI Quality Validator y la CLI
+(`spring-doc`).** El resto de componentes (Skill como motor ejecutable, LLM Provider concreto,
+Auditor, integraciones) estan definidos y documentados, pero no implementados. Ver
+`docs/12-Roadmap.md`.
 
 Funcionalidad disponible hoy:
 
@@ -54,6 +55,10 @@ Funcionalidad disponible hoy:
   determinarse con confianza (p. ej. un nombre de DTO ambiguo, un endpoint sin evidencia de
   codigo de respuesta, un `$ref` que no resuelve), se registra un `Diagnostic` en vez de
   suponerse (ver `docs/09-Auditoria.md`).
+- **CLI (`spring-doc`)** que orquesta los tres componentes anteriores: `analyze`, `generate`,
+  `validate`, con salida humana o `--json` (reporte estructurado, independiente del `--format`
+  del artefacto OpenAPI), `--strict`, `--quiet`, exit codes deterministas, y manejo diferenciado
+  de errores de usuario vs. errores internos. Ver "Uso de la CLI" mas abajo.
 
 ## Arquitectura (resumen)
 
@@ -93,7 +98,8 @@ Skill-Documentation-AI/
 ├── validators/       Placeholder sin uso (ver nota de nomenclatura en docs/03-Arquitectura.md)
 ├── generators/       OpenAPI Generator funcional (AnalysisResult -> OpenAPI 3.0.3)
 ├── validator/        OpenAPI Quality Validator funcional (documento OpenAPI -> Diagnostics)
-├── tests/           Tests del Analyzer, del Generator y del Validator
+├── cli/             CLI funcional (`spring-doc`): analyze / generate / validate
+├── tests/           Tests del Analyzer, del Generator, del Validator y de la CLI
 └── examples/        Microservicio Spring Boot de ejemplo (+ openapi.yaml/openapi.json generados)
 ```
 
@@ -111,10 +117,50 @@ source .venv/bin/activate
 pip install -e ".[dev]"
 ```
 
-## Ejecucion
+Esto deja disponible el comando `spring-doc` (entry point definido en `[project.scripts]`).
 
-No hay una CLI todavia (reservada para V0.6). El Analyzer, el Generator y el Validator se usan
-como libreria Python:
+## Uso de la CLI
+
+Tras instalar el paquete (ver "Instalacion"), queda disponible el comando `spring-doc` (tambien
+invocable como `python -m cli`):
+
+```bash
+# Analiza un proyecto Spring Boot (resumen humano).
+spring-doc analyze ./mi-servicio
+
+# Analiza y ademas genera+valida el OpenAPI (Analyzer -> Generator -> Validator).
+spring-doc analyze ./mi-servicio --openapi --format yaml --output openapi.yaml
+
+# Genera el OpenAPI directamente (a stdout, o a un archivo con --output).
+spring-doc generate ./mi-servicio --format yaml
+spring-doc generate ./mi-servicio --format json --output openapi.json
+
+# Valida un documento OpenAPI ya existente.
+spring-doc validate openapi.yaml
+
+# Reporte estructurado para automatizacion (nunca incluye el documento OpenAPI,
+# solo conteos y, si aplica, la ruta donde se escribio):
+spring-doc analyze ./mi-servicio --json
+
+# Los warnings tambien fallan el proceso (exit code 1):
+spring-doc validate openapi.yaml --strict
+
+# Version del paquete instalado:
+spring-doc --version
+```
+
+`--format` controla el formato del **artefacto** OpenAPI (`json`/`yaml`); `--json` controla el
+formato del **reporte** de la CLI sobre la operacion — son opciones independientes, nunca la
+misma cosa. Exit codes: `0` exito, `1` diagnostics que fallan el run (`ERROR` siempre, `WARNING`
+solo bajo `--strict`), `2` error de uso (proyecto/archivo inexistente, ruta de salida invalida,
+opcion desconocida), `3` error interno inesperado. Detalle completo de opciones, formas exactas
+del reporte `--json` y decisiones de diseno en `docs/03-Arquitectura.md` (decision 10) y
+`docs/13-Versionado.md`.
+
+## Uso como libreria
+
+El Analyzer, el Generator y el Validator tambien se pueden usar directamente como libreria
+Python (la CLI es una capa de orquestacion sobre las mismas APIs, sin logica propia):
 
 ```python
 from analyzer import analyze_project
@@ -172,14 +218,15 @@ fallback (sintaxis Java invalida a proposito). Ver `examples/README.md`.
   profundidad. Contra el documento real de `examples/customer-service` produce 0 diagnostics
   ERROR pero un volumen considerable de WARNING/INFO (sin `description` en ningun lado, sin
   `security` real) — comportamiento esperado, no un indicio de error. Ver `docs/05-OpenAPI.md`.
-- No hay auditoria, CLI ni integracion con Confluence todavia.
+- No hay auditoria ni integracion con Confluence todavia.
 - No existen implementaciones concretas de proveedores LLM; solo la interfaz (`providers/base.py`).
 
 ## Roadmap
 
-Ver `docs/12-Roadmap.md`. Resumen: V0.5 LLM Providers, V0.6 CLI, V0.7 Confluence Integration,
-V1.0 Production, V2.0 Documentation Quality Gate, V3.0 Drift Detection. (El Auditor, originalmente
-agrupado con el Validator en V0.4, queda sin version asignada.)
+Ver `docs/12-Roadmap.md`. Resumen: V0.7 Confluence Integration, V1.0 Production, V2.0
+Documentation Quality Gate, V3.0 Drift Detection. (El Auditor, originalmente agrupado con el
+Validator en V0.4, queda sin version asignada; LLM Providers, originalmente V0.5, se reprogramo
+sin numero fijo cuando V0.5 se reasigno a CLI & Developer Experience.)
 
 ## Futuras integraciones
 

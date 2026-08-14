@@ -54,11 +54,11 @@ Relacion conceptual entre componentes:
                       OpenAPI YAML/JSON
 ```
 
-**Importante:** esta arquitectura es conceptual para todo el proyecto. A la fecha (V0.3), estan
-implementados el **Analyzer** (V0.1, ampliado en V0.2) y el **OpenAPI Generator** (V0.3). El resto
-de componentes (Skill como motor ejecutable, LLM Provider concreto, Validator, Auditor, CLI,
-Integraciones) permanecen delimitados y documentados, pero no implementados (ver estado por
-componente mas abajo).
+**Importante:** esta arquitectura es conceptual para todo el proyecto. A la fecha (V0.5), estan
+implementados el **Analyzer** (V0.1, ampliado en V0.2), el **OpenAPI Generator** (V0.3), el
+**OpenAPI Quality Validator** (V0.4) y la **CLI** (V0.5, `spring-doc`). El resto de componentes
+(Skill como motor ejecutable, LLM Provider concreto, Auditor, Integraciones) permanecen
+delimitados y documentados, pero no implementados (ver estado por componente mas abajo).
 
 ## Componentes
 
@@ -172,11 +172,31 @@ componente mas abajo).
   el alcance unicamente al OpenAPI Quality Validator (ver arriba). El Auditor queda sin version
   asignada, pendiente de una futura directriz. Ver `docs/09-Auditoria.md` y `docs/12-Roadmap.md`.
 
-### CLI (no implementado en V0.1)
+### CLI (implementado en V0.5)
 
-- **Responsabilidad futura:** exponer el pipeline completo como herramienta de linea de comandos.
-- Reservado para V0.6. En V0.1 el Analyzer se utiliza directamente como libreria Python (ver
-  `README.md`).
+- **Responsabilidad:** exponer el pipeline `analyzer -> generators -> validator` como herramienta
+  de linea de comandos (`spring-doc`), sin reimplementar analisis, generacion ni validacion.
+- **Entrada:** argumentos de linea de comandos (`analyze <project>`, `generate <project>`,
+  `validate <openapi-file>`, mas opciones).
+- **Salida:** resumen humano por stdout/stderr, o reporte estructurado (`--json`) — nunca el
+  documento OpenAPI embebido en el reporte JSON, solo una referencia a su ruta (`outputs`).
+- **Dependencias externas:** ninguna nueva; `argparse` es libreria estandar (decision de Fase 2,
+  ver mas abajo). Ninguna dependencia hacia `javalang` ni hacia los modulos internos de Analyzer/
+  Generator/Validator: solo sus APIs publicas (`analyzer.analyze_project`,
+  `generators.generate`/`to_json`/`to_yaml`, `validator.validate`/`validate_json`/`validate_yaml`).
+- **Estructura interna:**
+  - `cli/main.py` — parser `argparse` (subcomandos `analyze`/`generate`/`validate`, `--version`),
+    despacho, calculo de exit code, manejo de errores de uso vs. errores internos.
+  - `cli/commands.py` — orquestacion: llama a `analyzer`/`generators`/`validator` y produce un
+    resultado interno (`AnalyzeOutcome`/`GenerateOutcome`/`ValidateOutcome`); calculo de
+    conteos por severidad y del `status` (`ok`/`error`, sensible a `--strict`).
+  - `cli/output.py` — dos formateadores independientes (humano y `--json`), sin logica de negocio.
+  - `cli/errors.py` — `CliUsageError`, unica excepcion propia de la CLI (errores de entrada del
+    usuario, exit code 2).
+- Detalle completo (opciones, exit codes, formas exactas del reporte `--json`) en
+  `prompts/V0.5—CLI-&-DEVELOPER-EXPERIENCE.md` (reportes de Fase 2/3) y `docs/13-Versionado.md`.
+- **No se modifico `analyzer/`, `generators/` ni `validator/`** durante su implementacion (mismo
+  proceso obligatorio que V0.3/V0.4, ver decision 10 mas abajo).
 
 ### Integraciones futuras (no implementadas en V0.1)
 
@@ -250,6 +270,12 @@ estaban) ni `generators/` (el Validator consume el `dict` de salida, no llama a 
   Analyzer, y tampoco importa `generators/` (no llama a `generate()`). El Generator, a su vez, no
   llama al Validator automaticamente. Ambos son componentes independientes que solo comparten el
   `dict` del documento OpenAPI como interfaz (verificado por grep sobre `validator/*.py`).
+- (V0.5) La CLI (`cli/`) **no** importa `javalang` ni ningun modulo interno de Analyzer
+  (`ast_analyzer`, `ast_backend`, `dto_analyzer`, `spring_boot_analyzer`, `analyzer.scanner`),
+  Generator (`openapi_types`, `openapi_schemas`) ni Validator (`openapi_rules`) — solo las APIs
+  publicas de los tres paquetes (verificado por grep sobre `cli/*.py`, cubierto ademas por un test
+  de regresion en `tests/test_cli_integration.py`). Es la misma disciplina de limites ya aplicada
+  en V0.3/V0.4, extendida a la capa de orquestacion.
 
 ## Decisiones arquitectonicas relevantes
 
@@ -302,8 +328,10 @@ estaban) ni `generators/` (el Validator consume el `dict` de salida, no llama a 
    presentar una inferencia como hecho contaminaria esa documentacion con informacion no
    verificable.
 
-5. **Sin CLI**: el Analyzer se consume como libreria Python. Evita adelantar el roadmap (V0.6
-   CLI).
+5. **Sin CLI hasta V0.5**: entre V0.1 y V0.4 el Analyzer/Generator/Validator se consumian
+   unicamente como libreria Python, para evitar adelantar el roadmap. V0.5 implementa la CLI
+   (ver punto 10 mas abajo); el roadmap original la ubicaba en V0.6 (reasignado, ver
+   `docs/12-Roadmap.md`).
 
 6. **`providers/` solo define la interfaz** (clase base abstracta), sin implementaciones
    concretas, para evitar acoplamiento a un LLM especifico y cumplir el Scope Lock. Sin cambios
@@ -344,3 +372,26 @@ estaban) ni `generators/` (el Validator consume el `dict` de salida, no llama a 
    comparacion literal de texto, entre otras), documentadas explicitamente como tales para no
    confundirlas con requisitos literales de la directriz. Ver `docs/05-OpenAPI.md` para el
    catalogo completo y las severidades.
+
+10. **V0.5 — CLI con `argparse` (stdlib), sin dependencias nuevas, sin modificar Analyzer/
+    Generator/Validator.** Evaluado formalmente en Fase 2 (`prompts/V0.5—CLI-&-DEVELOPER-
+    EXPERIENCE.md`): con solo 3 subcomandos y un puñado de opciones, `click`/`typer` no se
+    justifican frente a la prioridad explicita de minima dependencia; `argparse` es stdlib,
+    multiplataforma y suficiente. Estructura elegida: tres subcomandos independientes
+    (`analyze`/`generate`/`validate`) mas una unica variante combinada (`analyze --openapi`, que
+    ejecuta Analyzer -> Generator -> Validator en una sola invocacion), en vez de un cuarto
+    subcomando `pipeline`/`all` no solicitado. Decision explicita sobre semantica de opciones:
+    `--format json|yaml` controla el **artefacto** OpenAPI generado; `--json` controla el
+    **reporte** de la CLI sobre la operacion (conteos por severidad y, cuando aplica, la ruta del
+    artefacto bajo `outputs`) — nunca el mismo concepto, y el reporte `--json` nunca incluye el
+    documento OpenAPI embebido. Cuando `--json` se combina con generacion de OpenAPI sin
+    `--output`, es un error de uso (exit 2): el reporte JSON y el documento no pueden compartir
+    stdout. Exit codes deterministas: `0` exito, `1` diagnostics que fallan el run (`ERROR`
+    siempre, `WARNING` solo bajo `--strict`), `2` error de uso, `3` error interno inesperado (sin
+    traceback). `--output` crea directorios padres faltantes (`mkdir -p` implicito) en vez de
+    fallar, ya que no es una operacion destructiva y evita friccion innecesaria; sigue fallando
+    como error de uso si el destino no es escribible (p. ej. un directorio existente). El proceso
+    obligatorio de la seccion 6 (aplicado tambien en V0.3/V0.4) confirmo que el unico dato
+    "nuevo" que necesitaba la CLI (conteo de DTOs distintos para el resumen) podia derivarse
+    integramente de la API publica existente (`Parameter.dto`/`Response.dto`/`Field.nested_dto`)
+    sin modificar `analyzer/models.py`.
