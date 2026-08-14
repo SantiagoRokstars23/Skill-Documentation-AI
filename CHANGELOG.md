@@ -5,6 +5,31 @@ Todos los cambios relevantes de este proyecto se documentan en este archivo.
 El formato sigue las convenciones de [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y este proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 
+## [0.6.0] - 2026-08-14
+
+### Added
+
+- Infraestructura de LLM Providers (`providers/`), alrededor de la interfaz `LLMProvider` existente desde V0.1 (`providers/base.py`, sin cambios de contrato: `generate(self, prompt: str) -> str`).
+- `providers/config.py`: `ProviderConfig` (dataclass inmutable: `provider`, `model`, `api_key`), con `from_env()` leyendo `SPRING_DOC_LLM_PROVIDER`/`_MODEL`/`_API_KEY`. `api_key` se excluye de `repr()`/`str()` para que nunca aparezca en logs por accidente.
+- `providers/errors.py`: jerarquia propia de excepciones (`LLMProviderError` + `ProviderNotConfiguredError`, `UnknownProviderError`, `MissingCredentialError`, `InvalidModelError`, `ProviderTimeoutError`, `ProviderRequestError`, `InvalidResponseError`), para que ningun consumidor futuro necesite conocer excepciones de un SDK concreto.
+- `providers/fake.py`: `FakeProvider`, unica implementacion concreta de `LLMProvider` en V0.6 — determinista, sin red, sin credenciales, pensada para tests.
+- `providers/registry.py`: `get_provider(config) -> LLMProvider`, seleccion por nombre sobre un `dict[str, Callable]` (no una clase Factory ni un sistema de plugins — patron minimo justificado en Fase 2).
+- `skills/spring-doc/SKILL.md` (autorizado explicitamente junto con la Fase 3, ademas del alcance original de la directriz): conocimiento/proceso LLM-agnostico, agente-agnostico y motor-agnostico para documentar el API HTTP de un microservicio Java/Spring Boot leyendo su codigo fuente directamente (que buscar en controllers/mappings/parametros/DTOs/respuestas/seguridad, como tratar ambiguedad e informacion faltante sin inventar, como estructurar el resultado). No depende de `spring-doc` (la CLI), no la requiere, y no describe la arquitectura interna de este proyecto (`providers/`, `analyzer/`, `generators/`, `validator/`, `cli/`); puede mencionar `spring-doc` una vez, de forma generica, como herramienta externa opcional, nunca como requisito. Pensado para copiarse solo y entregarse, junto con un proyecto Spring Boot, a cualquier LLM. **Correccion de alcance:** la primera implementacion documentaba como invocar la CLI `spring-doc`; se reescribio por completo a pedido explicito del responsable del proyecto para eliminar esa dependencia.
+- 39 tests nuevos (308 -> 347): `ProviderConfig` (construccion, `from_env`, inmutabilidad, `api_key` nunca en `repr`/`str`), jerarquia de errores, `FakeProvider` (determinismo, contrato), registro (resolucion por nombre, provider desconocido, sin configurar), aislamiento (Analyzer/Generator/Validator/CLI funcionan sin ninguna variable `SPRING_DOC_LLM_*`, y ninguno de esos paquetes importa `providers`), validaciones sobre `skills/spring-doc/SKILL.md` (frontmatter valido, no referencia la arquitectura interna del proyecto ni sintaxis de la CLI, no se dirige a un agente/proveedor concreto, menciones de `spring-doc` -si las hay- quedan enmarcadas como opcionales, ensena los principios de evidencia esperados, es autocontenido), y una regresion en `cli/commands.py::run_validate` (ver mas abajo).
+
+### Changed
+
+- `pyproject.toml`: version `0.5.0` -> `0.6.0`. Ninguna dependencia de runtime ni dev nueva (toda la infraestructura usa exclusivamente la libreria estandar).
+- `providers/__init__.py`, `providers/base.py`: docstrings actualizados; API publica del paquete ampliada con `ProviderConfig`, `get_provider`, `FakeProvider` y la jerarquia de `providers.errors`.
+- `docs/12-Roadmap.md`, `docs/13-Versionado.md`, `docs/03-Arquitectura.md`, `docs/06-LLM.md`, `README.md`: actualizados para reflejar la infraestructura de providers y `skills/spring-doc/SKILL.md`.
+
+### Scope
+
+- No se implemento RAG, embeddings, vector databases, agentes, MCP, tool calling avanzado, memoria, aprendizaje, fine-tuning, chat UI, generacion inteligente de documentacion, analisis semantico via LLM, explicacion automatica de diagnostics, Auditor avanzado, Drift Detection, Confluence, Jira, GitHub integration, CI/CD, Docker, ni cloud deployment. Ver `docs/12-Roadmap.md`.
+- **No se implemento ningun provider comercial real** (Anthropic, OpenAI, Gemini, etc.): se evaluo explicitamente un `AnthropicProvider` via `urllib` (stdlib, sin SDK, costo en dependencias nulo) en Fase 2, y se descarto por decision explicita del responsable del proyecto, priorizando la superficie minima. Solo `FakeProvider` existe.
+- `analyzer/`, `generators/` y `validator/` no se modificaron. `cli/` recibio una unica excepcion puntual autorizada explicitamente: `cli/commands.py::run_validate` no protegia la lectura del archivo (`path.read_text` sin capturar `OSError`/`UnicodeDecodeError`), a diferencia de `write_output_file`; un archivo no-UTF-8 o sin permisos de lectura producia exit code 3 ("error interno") en vez de 2 ("error de uso"). Corregido con el mismo patron ya usado en `write_output_file`, mas un test de regresion — ningun otro comportamiento de la CLI cambio. Los 308 tests previos a V0.6 no se modificaron y continuan pasando. Verificado por grep y por `tests/test_providers_isolation.py` que `cli/` (y los demas tres paquetes) no importan `providers`.
+- **Nota de nomenclatura:** `skills/spring-doc/` (plural, nuevo en V0.6) no debe confundirse con `skill/` (singular, desde V0.1) — son artefactos distintos sin relacion entre si. Ver `docs/03-Arquitectura.md`.
+
 ## [0.5.0] - 2026-08-14
 
 ### Added
@@ -17,7 +42,7 @@ y este proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 - `--quiet` suprime el resumen humano solo cuando el resultado es `ok` (un fallo causado por `--strict` sigue mostrando el detalle, para no ocultar por que fallo).
 - `--output` crea directorios padres faltantes automaticamente; sigue siendo error de uso si el destino no es escribible (p. ej. apunta a un directorio existente).
 - `cli/errors.py`: `CliUsageError`, unica excepcion propia de la CLI, distingue errores de entrada del usuario (exit 2) de errores internos inesperados (exit 3, capturados en el punto de entrada).
-- 47 tests nuevos (260 -> 307): parser (help/version/comando desconocido/argumentos invalidos), cada comando, exit codes, `--strict`/`--quiet`/`--json`, separacion `--format`/`--json`, `--openapi`, escritura a archivo, integracion real contra `examples/customer-service`, determinismo, portabilidad de rutas (`pathlib`/`tmp_path`), y verificacion por grep de que `cli/` no importa modulos internos de Analyzer/Generator/Validator ni `javalang`.
+- 48 tests nuevos (260 -> 308): parser (help/version/comando desconocido/argumentos invalidos), cada comando, exit codes, `--strict`/`--quiet`/`--json`, separacion `--format`/`--json`, `--openapi`, escritura a archivo, integracion real contra `examples/customer-service`, determinismo, portabilidad de rutas (`pathlib`/`tmp_path`), verificacion por grep de que `cli/` no importa modulos internos de Analyzer/Generator/Validator ni `javalang`, y una regresion encontrada en revision pre-commit (`_symbol()` evaluaba siempre la codificacion de `sys.stdout` aunque el banner fuera a stderr).
 
 ### Changed
 

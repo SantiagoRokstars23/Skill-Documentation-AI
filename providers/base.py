@@ -2,8 +2,11 @@
 
 Define el contrato que cualquier proveedor de LLM debera implementar para ser usado
 por el sistema, sin acoplar el proyecto a ningun proveedor concreto. Ver
-docs/06-LLM.md. No existen implementaciones concretas en V0.1 (Scope Lock, ver
-prompts/V0.1-foundation.md seccion 19).
+docs/06-LLM.md. Sin cambios desde V0.1: V0.6 anade infraestructura alrededor de
+esta interfaz (``providers/config.py``, ``providers/errors.py``,
+``providers/registry.py``) y una implementacion Fake/Mock (``providers/fake.py``),
+pero no modifica el contrato de ``LLMProvider`` en si. No existe todavia ningun
+provider comercial concreto (ver docs/12-Roadmap.md).
 """
 
 from __future__ import annotations

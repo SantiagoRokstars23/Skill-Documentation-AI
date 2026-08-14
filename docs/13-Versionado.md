@@ -106,9 +106,83 @@ opcion. `--format` determina el formato del artefacto OpenAPI (`generate`/`analy
 severidad), nunca el documento OpenAPI embebido. Cuando `--json` se combina con generacion de
 OpenAPI, `--output` es obligatorio (el reporte JSON y el documento no pueden compartir stdout).
 
-47 tests nuevos (260 -> 307) cubriendo parser (help/version/comando desconocido/argumentos invalidos), cada comando, exit
+48 tests nuevos (260 -> 308) cubriendo parser (help/version/comando desconocido/argumentos invalidos), cada comando, exit
 codes, `--strict`/`--quiet`/`--json`, separacion `--format`/`--json`, `--openapi`, escritura a
 archivo, integracion real contra `examples/customer-service`, determinismo, portabilidad de rutas
-(`pathlib`/`tmp_path`), y el limite arquitectonico de la CLI (verificado por grep sobre `cli/*.py`:
+(`pathlib`/`tmp_path`), el limite arquitectonico de la CLI (verificado por grep sobre `cli/*.py`:
 sin referencias a `ast_analyzer`, `ast_backend`, `dto_analyzer`, `spring_boot_analyzer`,
-`analyzer.scanner`, `openapi_types`, `openapi_schemas`, `openapi_rules` ni `javalang`).
+`analyzer.scanner`, `openapi_types`, `openapi_schemas`, `openapi_rules` ni `javalang`), y una
+regresion encontrada en revision pre-commit (`cli/output.py::_symbol` evaluaba siempre la
+codificacion de `sys.stdout` incluso cuando el banner se imprime en `stderr`; corregido para
+evaluar la codificacion del stream real de destino).
+
+### V0.5.0 -> V0.6.0
+
+**Sin cambios en `analyzer/`, `generators/`, `validator/`.** V0.6 (LLM Providers & AI Foundation)
+no modifico ningun archivo de esos tres paquetes; verificado por grep (ninguno referencia
+`providers`) y por tests de aislamiento dedicados (`tests/test_providers_isolation.py`).
+
+**Excepcion puntual en `cli/` (autorizada explicitamente, fuera del alcance original de la
+directriz):** la revision pre-commit encontro un bug real preexistente desde V0.5 en
+`cli/commands.py::run_validate` — leia el archivo con `path.read_text(encoding="utf-8")` sin
+proteger la excepcion, a diferencia de `write_output_file` (que ya capturaba `OSError`); un
+archivo no-UTF-8 o sin permisos de lectura producia un error interno no controlado (exit 3) en
+vez de un error de uso (exit 2), inconsistente con el resto de la CLI. Corregido para envolver la
+lectura en el mismo patron `OSError -> CliUsageError` ya usado en `write_output_file`, mas un test
+de regresion. Es la unica linea modificada en `cli/`; no se toco ninguna otra funcionalidad ni
+comportamiento existente. `cli/` sigue sin importar `providers` (verificado por grep y por
+`tests/test_providers_isolation.py`, que no dependen de este fix puntual).
+
+`providers/base.py` (`LLMProvider`, ver `docs/06-LLM.md`) **tampoco cambio su contrato**
+(`generate(self, prompt: str) -> str`, sin cambios desde V0.1); solo se actualizo su docstring.
+Se agregan cuatro modulos nuevos dentro de `providers/`:
+
+- `providers/config.py` — `ProviderConfig` (dataclass inmutable: `provider`, `model`, `api_key`),
+  con `from_env()` leyendo `SPRING_DOC_LLM_PROVIDER`/`_MODEL`/`_API_KEY`. `api_key` se excluye de
+  `repr()`/`str()` (campo `repr=False`) para que nunca aparezca en logs por accidente.
+- `providers/errors.py` — jerarquia propia de excepciones (`LLMProviderError` y siete subclases:
+  `ProviderNotConfiguredError`, `UnknownProviderError`, `MissingCredentialError`,
+  `InvalidModelError`, `ProviderTimeoutError`, `ProviderRequestError`, `InvalidResponseError`),
+  para que el resto del proyecto nunca necesite conocer excepciones de un SDK concreto.
+- `providers/fake.py` — `FakeProvider`, unica implementacion concreta de `LLMProvider` en V0.6:
+  determinista, sin red, sin credenciales. **No se implemento ningun provider comercial real**
+  (decision explicita, autorizada tras evaluar en Fase 2 un `AnthropicProvider` via `urllib`
+  stdlib sin SDK; se opto por la superficie minima, ver `prompts/V0.6—LLM-PROVIDERS-&-AI-
+  FOUNDATION.md` seccion 22: "la calidad de la abstraccion... es mas importante que la cantidad
+  de providers implementados").
+- `providers/registry.py` — `get_provider(config) -> LLMProvider`, un `dict[str, Callable]` de
+  seleccion por nombre (no una clase Factory ni un sistema de plugins — patron minimo justificado
+  en Fase 2). Solo `"fake"` esta registrado en V0.6.
+
+**Ninguna dependencia nueva**, runtime ni dev: toda la infraestructura usa exclusivamente la
+libreria estandar (`dataclasses`, `os`) mas lo que ya existia (`pytest`).
+
+Se agrega tambien `skills/spring-doc/SKILL.md` (fuera de `providers/`, no es codigo Python):
+conocimiento/proceso para documentar el API HTTP de un microservicio Java/Spring Boot leyendo su
+codigo fuente directamente (que buscar en controllers/mappings/parametros/DTOs/respuestas/
+seguridad, como tratar ambiguedad e informacion faltante, como estructurar el resultado).
+**LLM-agnostico, agente-agnostico y motor-agnostico**: no depende de `spring-doc` (la CLI), no la
+requiere, y no describe la arquitectura interna de este proyecto (`providers/`, `analyzer/`,
+`generators/`, `validator/`, `cli/` no se mencionan). Puede mencionar `spring-doc` una vez, de
+forma generica, como herramienta externa opcional, nunca como requisito — pensado para poder
+copiarse solo y entregarse a cualquier LLM junto con un proyecto Java/Spring Boot.
+**Correccion de alcance durante Fase 3/4:** la primera version implementada documentaba como
+invocar la CLI `spring-doc` (comandos, opciones, exit codes, forma del reporte `--json`); a
+pedido explicito del responsable del proyecto se reescribio por completo para eliminar esa
+dependencia, junto con los tests que la verificaban (ver mas abajo). **Nota de nomenclatura:**
+`skills/spring-doc/` (plural, nuevo en V0.6) no debe confundirse con `skill/` (singular, desde
+V0.1): este ultimo es el componente conceptual de la arquitectura del producto
+(`docs/04-Skill.md`), que asume metadata ya extraida por el Analyzer de este proyecto;
+`skills/spring-doc/SKILL.md` asume que el LLM lee el codigo fuente Java directamente, sin ningun
+Analyzer de por medio, y no forma parte del pipeline `Analyzer -> Skill -> LLM Provider ->
+Generator -> Validator -> Auditor`. Ambos coexisten sin relacion entre si.
+
+39 tests nuevos (308 -> 347): `ProviderConfig` (construccion, `from_env`, inmutabilidad, `api_key`
+nunca en `repr`/`str`), jerarquia de errores, `FakeProvider` (determinismo, contrato), registro
+(resolucion por nombre, provider desconocido, sin configurar), aislamiento (Analyzer/Generator/
+Validator/CLI funcionan sin ninguna variable `SPRING_DOC_LLM_*`, y ninguno de esos paquetes
+importa `providers`), validaciones sobre `skills/spring-doc/SKILL.md` (frontmatter valido, no
+referencia la arquitectura interna del proyecto ni sintaxis de la CLI, no se dirige a un
+agente/proveedor concreto, menciones de `spring-doc` -si las hay- quedan enmarcadas como
+opcionales, ensena los principios de evidencia esperados, y es autocontenido), y la regresion de
+`cli/commands.py::run_validate` sobre archivos no-UTF-8/no legibles (ver mas arriba).

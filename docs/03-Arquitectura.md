@@ -54,11 +54,13 @@ Relacion conceptual entre componentes:
                       OpenAPI YAML/JSON
 ```
 
-**Importante:** esta arquitectura es conceptual para todo el proyecto. A la fecha (V0.5), estan
+**Importante:** esta arquitectura es conceptual para todo el proyecto. A la fecha (V0.6), estan
 implementados el **Analyzer** (V0.1, ampliado en V0.2), el **OpenAPI Generator** (V0.3), el
-**OpenAPI Quality Validator** (V0.4) y la **CLI** (V0.5, `spring-doc`). El resto de componentes
-(Skill como motor ejecutable, LLM Provider concreto, Auditor, Integraciones) permanecen
-delimitados y documentados, pero no implementados (ver estado por componente mas abajo).
+**OpenAPI Quality Validator** (V0.4), la **CLI** (V0.5, `spring-doc`) y la **infraestructura de
+LLM Providers** (V0.6: configuracion, errores, seleccion por nombre, y un `FakeProvider`
+determinista — sin ningun provider comercial concreto). El resto de componentes (Skill como motor
+ejecutable, Auditor, Integraciones) permanecen delimitados y documentados, pero no implementados
+(ver estado por componente mas abajo).
 
 ## Componentes
 
@@ -99,7 +101,7 @@ delimitados y documentados, pero no implementados (ver estado por componente mas
 - **Dependencias:** consume la salida del Analyzer; no depende de ningun LLM concreto.
 - Detalle en `docs/04-Skill.md`.
 
-### LLM Provider (interfaz definida en V0.1)
+### LLM Provider (interfaz definida en V0.1, infraestructura ampliada en V0.6)
 
 - **Responsabilidad:** exponer una interfaz uniforme para invocar un LLM, independientemente del
   proveedor concreto (Claude, Gemini, OpenAI, u otros compatibles).
@@ -107,8 +109,22 @@ delimitados y documentados, pero no implementados (ver estado por componente mas
 - **Salida:** contenido generado por el LLM (texto/estructura, interpretado por el Generator).
 - **Dependencias:** ninguna dependencia arquitectonica de componentes superiores hacia un
   proveedor especifico. Ver `docs/06-LLM.md`.
-- **Estado en V0.1:** solo la interfaz conceptual (`providers/base.py`). Sin implementaciones
-  concretas (fuera de alcance, ver Scope Lock).
+- **Contrato (`providers/base.py`):** `LLMProvider.generate(self, prompt: str) -> str`. Sin
+  cambios desde V0.1 — V0.6 no modifico esta interfaz.
+- **Estructura interna (V0.6):**
+  - `providers/config.py` — `ProviderConfig` (dataclass inmutable: `provider`, `model`,
+    `api_key`), con `from_env()` leyendo variables de entorno (`SPRING_DOC_LLM_PROVIDER`/
+    `_MODEL`/`_API_KEY`). `api_key` nunca aparece en `repr()`/`str()`.
+  - `providers/errors.py` — jerarquia propia (`LLMProviderError` + 7 subclases) para que ningun
+    consumidor necesite conocer excepciones de un SDK concreto.
+  - `providers/fake.py` — `FakeProvider`: unica implementacion concreta de `LLMProvider` en V0.6,
+    determinista, sin red ni credenciales.
+  - `providers/registry.py` — `get_provider(config) -> LLMProvider`: seleccion por nombre sobre
+    un `dict[str, Callable]` (deliberadamente no una clase Factory ni un sistema de plugins).
+- **Estado en V0.6:** infraestructura completa y probada; **ningun provider comercial real**
+  (decision explicita, ver `docs/13-Versionado.md` seccion "V0.5.0 -> V0.6.0" y decision
+  arquitectonica 11 mas abajo). Ningun otro componente (`analyzer/`, `generators/`, `validator/`,
+  `cli/`) importa `providers/` — verificado por grep y por tests de aislamiento.
 
 ### OpenAPI Generator (implementado en V0.3)
 
@@ -203,6 +219,27 @@ delimitados y documentados, pero no implementados (ver estado por componente mas
 - Integracion con Confluence y con el proyecto Python existente. Reservado para V0.7. Ver
   `docs/11-Integracion.md`.
 
+### `skills/spring-doc/SKILL.md` (agregado en V0.6, no es un componente del pipeline)
+
+- **Responsabilidad:** conocimiento/proceso, independiente de LLM/agente/herramienta, para
+  documentar el API HTTP de un microservicio Java/Spring Boot leyendo su codigo fuente
+  directamente (que buscar en controllers/mappings/parametros/DTOs/respuestas/seguridad, como
+  tratar la ambiguedad y la informacion faltante, como estructurar el resultado). **No depende de
+  `spring-doc` (la CLI), no la requiere, y no describe la arquitectura interna de este proyecto**
+  (`providers/`, `analyzer/`, `generators/`, `validator/`, `cli/` no se mencionan dentro del
+  archivo — verificado por test). Puede mencionar `spring-doc` una vez, de forma generica, como
+  herramienta externa opcional, nunca como requisito. No es codigo Python, no se importa, no
+  participa del pipeline `Analyzer -> Skill -> LLM Provider -> Generator -> Validator -> Auditor
+  -> CLI` — es un documento de conocimiento autocontenido, pensado para poder copiarse solo y
+  entregarse a cualquier LLM junto con un proyecto Java/Spring Boot.
+- **Nota de nomenclatura (evitar confusion con `skill/`, singular):** `skills/spring-doc/` (plural)
+  **no** es el componente conceptual "Skill" de la arquitectura del producto descrito arriba
+  (`skill/`, singular, desde V0.1 — conocimiento para que un LLM Provider documente APIs a partir
+  de evidencia ya extraida por el Analyzer, ver `docs/04-Skill.md`). Son artefactos distintos con
+  un supuesto de entrada diferente: `skill/` asume metadata ya extraida por el Analyzer de este
+  proyecto; `skills/spring-doc/SKILL.md` asume que el LLM lee el codigo fuente Java directamente,
+  sin ningun Analyzer de por medio. Conviven sin relacion de dependencia entre si.
+
 ## Flujo de informacion (V0.4)
 
 ```text
@@ -276,6 +313,11 @@ estaban) ni `generators/` (el Validator consume el `dict` de salida, no llama a 
   publicas de los tres paquetes (verificado por grep sobre `cli/*.py`, cubierto ademas por un test
   de regresion en `tests/test_cli_integration.py`). Es la misma disciplina de limites ya aplicada
   en V0.3/V0.4, extendida a la capa de orquestacion.
+- (V0.6) `providers/` **no** es importado por `analyzer/`, `generators/`, `validator/` ni `cli/`
+  — el limite se verifica ahora en ambas direcciones (ya se sabia que el Analyzer no conoce a la
+  Skill/LLM Provider; V0.6 confirma que tampoco lo hacen Generator/Validator/CLI, verificado por
+  grep y por `tests/test_providers_isolation.py`). Ningun componente existente adquirio una
+  dependencia implicita sobre Providers.
 
 ## Decisiones arquitectonicas relevantes
 
@@ -395,3 +437,30 @@ estaban) ni `generators/` (el Validator consume el `dict` de salida, no llama a 
     "nuevo" que necesitaba la CLI (conteo de DTOs distintos para el resumen) podia derivarse
     integramente de la API publica existente (`Parameter.dto`/`Response.dto`/`Field.nested_dto`)
     sin modificar `analyzer/models.py`.
+
+11. **V0.6 — Infraestructura de LLM Providers sin provider comercial, sin dependencias nuevas, sin
+    modificar Analyzer/Generator/Validator/CLI.** Evaluado en Fase 2
+    (`prompts/V0.6—LLM-PROVIDERS-&-AI-FOUNDATION.md`): se mantuvo `LLMProvider(ABC)` (V0.1) sin
+    cambios en vez de migrar a `typing.Protocol` (perderia la verificacion en tiempo de ejecucion
+    de la que ya dependia un test existente) o introducir un sistema de plugins (no justificado,
+    la directriz exige explicitamente no asumir un patron sin justificarlo). La seleccion de
+    provider por nombre se resolvio con un `dict[str, Callable]` (`providers/registry.py`) en vez
+    de una clase Factory — superficie minima que cubre "seleccion del provider" sin introducir un
+    framework. La forma de la respuesta se mantuvo como `str` (no una `LLMResponse` con
+    metadata/usage) por ausencia de un consumidor real que lo necesite hoy; se puede ampliar mas
+    adelante sin romper el contrato. Configuracion via variables de entorno
+    (`SPRING_DOC_LLM_PROVIDER`/`_MODEL`/`_API_KEY`) en vez de `.env` (evita la dependencia
+    `python-dotenv`) o un archivo YAML/JSON de config (sin necesidad demostrada). Se evaluo
+    explicitamente implementar un `AnthropicProvider` real via `urllib` (stdlib, sin el SDK
+    `anthropic`) — costo en dependencias nulo — pero se descarto por decision explicita del
+    responsable del proyecto, priorizando la superficie minima justificada por la directriz
+    (seccion 22: "la calidad de la abstraccion... es mas importante que la cantidad de providers
+    implementados"); queda como trabajo futuro cuando exista un consumidor real. Se agrego ademas
+    `skills/spring-doc/SKILL.md` (autorizado explicitamente junto con la Fase 3, fuera del alcance
+    original de la directriz de V0.6, y corregido de alcance una vez implementado: la primera
+    version documentaba como invocar la CLI `spring-doc`; a pedido explicito del responsable del
+    proyecto se reescribio para ser un artefacto de conocimiento LLM-agnostico, agente-agnostico y
+    motor-agnostico que ensena a documentar un microservicio Spring Boot leyendo su codigo fuente
+    directamente, sin depender de `spring-doc` ni describir la arquitectura interna de este
+    proyecto — ver seccion "Componentes" mas arriba para el detalle y la nota de nomenclatura
+    frente a `skill/`, singular).

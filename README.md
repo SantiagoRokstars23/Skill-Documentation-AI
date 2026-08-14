@@ -17,12 +17,13 @@ Reducir ese problema mediante automatizacion, analisis estatico deterministico d
 capacidades de LLM controladas por una Skill especializada, manteniendo el sistema independiente
 de cualquier proveedor de LLM concreto. Ver `docs/02-Objetivos.md`.
 
-## Estado actual — V0.5 (CLI & Developer Experience)
+## Estado actual — V0.6 (LLM Providers & AI Foundation)
 
-**Funcional: el Analyzer, el OpenAPI Generator, el OpenAPI Quality Validator y la CLI
-(`spring-doc`).** El resto de componentes (Skill como motor ejecutable, LLM Provider concreto,
-Auditor, integraciones) estan definidos y documentados, pero no implementados. Ver
-`docs/12-Roadmap.md`.
+**Funcional: el Analyzer, el OpenAPI Generator, el OpenAPI Quality Validator, la CLI
+(`spring-doc`) y la infraestructura de LLM Providers** (configuracion, errores, seleccion por
+nombre, y un `FakeProvider` determinista — **sin ningun proveedor comercial real todavia**). El
+resto de componentes (Skill como motor ejecutable, Auditor, integraciones) estan definidos y
+documentados, pero no implementados. Ver `docs/12-Roadmap.md`.
 
 Funcionalidad disponible hoy:
 
@@ -92,14 +93,17 @@ Skill-Documentation-AI/
 ├── pyproject.toml
 ├── docs/            Documentacion (arquitectura, skill, OpenAPI, LLM, analisis, seguridad, ...)
 ├── prompts/         Directrices de cada version del proyecto
-├── skill/           Skill de documentacion (SKILL.md, rules/, references/, templates/)
-├── providers/       Interfaz de LLM Provider (sin implementaciones concretas)
+├── skill/           Skill de documentacion (SKILL.md, rules/, references/, templates/) -- V0.1,
+│                    componente conceptual del producto, no confundir con skills/ (ver abajo)
+├── skills/spring-doc/  SKILL.md (V0.6): como documentar un microservicio Spring Boot leyendo su
+│                    codigo fuente, LLM/agente/herramienta-agnostico, independiente de spring-doc
+├── providers/       LLM Provider: interfaz (V0.1) + config/errores/registry/FakeProvider (V0.6)
 ├── analyzer/        Analyzer funcional para Java/Spring Boot (motor AST + fallback regex)
 ├── validators/       Placeholder sin uso (ver nota de nomenclatura en docs/03-Arquitectura.md)
 ├── generators/       OpenAPI Generator funcional (AnalysisResult -> OpenAPI 3.0.3)
 ├── validator/        OpenAPI Quality Validator funcional (documento OpenAPI -> Diagnostics)
 ├── cli/             CLI funcional (`spring-doc`): analyze / generate / validate
-├── tests/           Tests del Analyzer, del Generator, del Validator y de la CLI
+├── tests/           Tests del Analyzer, del Generator, del Validator, de la CLI y de providers/
 └── examples/        Microservicio Spring Boot de ejemplo (+ openapi.yaml/openapi.json generados)
 ```
 
@@ -122,7 +126,7 @@ Esto deja disponible el comando `spring-doc` (entry point definido en `[project.
 ## Uso de la CLI
 
 Tras instalar el paquete (ver "Instalacion"), queda disponible el comando `spring-doc` (tambien
-invocable como `python -m cli`):
+invocable como `python -m cli`).
 
 ```bash
 # Analiza un proyecto Spring Boot (resumen humano).
@@ -183,6 +187,18 @@ for diagnostic in validate(document):
     print(diagnostic.severity.value, diagnostic.code, diagnostic.message)
 ```
 
+## Skill de documentacion para LLMs (`skills/spring-doc/SKILL.md`)
+
+`skills/spring-doc/SKILL.md` es un documento de conocimiento independiente — LLM-agnostico,
+agente-agnostico y no ligado a `spring-doc` ni a ningun otro componente de este proyecto — que
+ensena a un LLM como documentar el API HTTP de un microservicio Java/Spring Boot leyendo su
+codigo fuente directamente: que buscar (controllers, mappings, parametros, DTOs, respuestas,
+seguridad), como tratar la ambiguedad y la informacion faltante sin inventar, y como estructurar
+el resultado. Se puede copiar como un `.md` suelto y entregarse, junto con el codigo fuente de un
+proyecto Spring Boot, a cualquier LLM. No requiere `spring-doc` ni ninguna otra herramienta; puede
+mencionarla como opcion, nunca como requisito. No debe confundirse con `skill/` (singular, V0.1),
+el componente conceptual de la arquitectura del producto — ver `docs/03-Arquitectura.md`.
+
 ## Ejecucion de tests
 
 ```bash
@@ -219,14 +235,18 @@ fallback (sintaxis Java invalida a proposito). Ver `examples/README.md`.
   ERROR pero un volumen considerable de WARNING/INFO (sin `description` en ningun lado, sin
   `security` real) — comportamiento esperado, no un indicio de error. Ver `docs/05-OpenAPI.md`.
 - No hay auditoria ni integracion con Confluence todavia.
-- No existen implementaciones concretas de proveedores LLM; solo la interfaz (`providers/base.py`).
+- `providers/` tiene la interfaz (V0.1) y la infraestructura completa (V0.6: configuracion,
+  errores, seleccion por nombre), pero **ningun proveedor comercial real** — solo `FakeProvider`,
+  pensado para tests. Ningun comando de la CLI (`analyze`/`generate`/`validate`) usa `providers/`
+  en absoluto: no hace falta configurar nada de esto para usar `spring-doc`.
 
 ## Roadmap
 
 Ver `docs/12-Roadmap.md`. Resumen: V0.7 Confluence Integration, V1.0 Production, V2.0
 Documentation Quality Gate, V3.0 Drift Detection. (El Auditor, originalmente agrupado con el
 Validator en V0.4, queda sin version asignada; LLM Providers, originalmente V0.5, se reprogramo
-sin numero fijo cuando V0.5 se reasigno a CLI & Developer Experience.)
+sin numero fijo cuando V0.5 se reasigno a CLI & Developer Experience, y V0.6 lo retomo con
+directriz propia.)
 
 ## Futuras integraciones
 

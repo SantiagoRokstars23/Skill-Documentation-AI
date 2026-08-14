@@ -212,7 +212,10 @@ def run_generate(
 
 def run_validate(openapi_file: str) -> ValidateOutcome:
     path = require_existing_file(openapi_file)
-    text = path.read_text(encoding="utf-8")
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise CliUsageError(f"No se pudo leer '{openapi_file}': {exc}") from exc
     if path.suffix.lower() == ".json":
         diagnostics = validate_openapi_json(text)
     else:

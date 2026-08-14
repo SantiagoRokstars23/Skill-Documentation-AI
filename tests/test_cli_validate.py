@@ -78,3 +78,15 @@ def test_validate_unknown_extension_falls_back_to_yaml_parser(capsys, tmp_path):
     exit_code, out, _ = run_cli(capsys, ["validate", str(renamed)])
     assert exit_code in (0, 1)
     assert "Errors: 0" in out
+
+
+def test_validate_file_not_valid_utf8_is_usage_error_not_internal_error(capsys, tmp_path):
+    """Regresion: un archivo no-UTF-8 (o sin permisos de lectura) debia producir un
+    error interno no controlado (exit 3) en vez de un error de uso (exit 2),
+    porque run_validate no protegia path.read_text() como si lo hace
+    write_output_file() con OSError. Ver cli/commands.py::run_validate."""
+    path = tmp_path / "not-utf8.yaml"
+    path.write_bytes(b"\xff\xfe\x00\x01invalid-utf8-bytes")
+    exit_code, _, err = run_cli(capsys, ["validate", str(path)])
+    assert exit_code == 2
+    assert "Error" in err

@@ -35,7 +35,26 @@ class LLMProvider(ABC):
 ```
 
 Ver `providers/base.py` para la definicion real. Cualquier implementacion concreta (Claude,
-Gemini, OpenAI, etc.) debera heredar de esta interfaz en una version futura (V0.5).
+Gemini, OpenAI, etc.) debera heredar de esta interfaz.
+
+## Infraestructura de providers (V0.6)
+
+V0.6 agrega, alrededor de la interfaz de arriba (sin modificarla), la infraestructura minima para
+poder tener providers concretos en el futuro:
+
+- `providers/config.py` — `ProviderConfig` (seleccion de provider, modelo, credencial), leible
+  desde variables de entorno (`SPRING_DOC_LLM_PROVIDER`/`_MODEL`/`_API_KEY`) o construible de
+  forma explicita. La credencial nunca aparece en su representacion por defecto.
+- `providers/errors.py` — jerarquia de excepciones propia (`LLMProviderError` y subclases), para
+  que ningun consumidor necesite conocer excepciones de un SDK concreto.
+- `providers/registry.py` — `get_provider(config)`, seleccion de la implementacion por nombre.
+- `providers/fake.py` — `FakeProvider`, unica implementacion concreta en V0.6: determinista, sin
+  red, pensada para tests. **No hay ningun provider comercial real implementado todavia** (Claude,
+  Gemini, OpenAI...); ver `docs/12-Roadmap.md` y `docs/13-Versionado.md` para el detalle y la
+  justificacion de esa decision.
+
+Ningun componente existente (Analyzer, Generator, Validator, CLI) depende de `providers/`; esta
+infraestructura puede existir sin alterar el flujo actual (`analyze`/`generate`/`validate`).
 
 ## Proveedores potenciales (fases futuras)
 
