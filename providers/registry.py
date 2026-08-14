@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from .anthropic import AnthropicProvider
 from .base import LLMProvider
 from .config import ProviderConfig
 from .errors import ProviderNotConfiguredError, UnknownProviderError
@@ -17,6 +18,7 @@ from .fake import FakeProvider
 
 _REGISTRY: dict[str, Callable[[ProviderConfig], LLMProvider]] = {
     "fake": lambda config: FakeProvider(),
+    "anthropic": lambda config: AnthropicProvider(config),
 }
 
 

@@ -10,11 +10,18 @@ completarse (criterios de aceptacion + Definition of Done) antes de iniciar la s
 | V0.3 | OpenAPI Generator | Completada (`v0.3.0`) |
 | V0.4 | OpenAPI Quality Validator | Completada (`v0.4.0`) |
 | V0.5 | CLI & Developer Experience | Completada (`v0.5.0`) |
-| V0.6 | LLM Providers & AI Foundation | **Completada / esta version** |
-| V0.7 | Confluence Integration | Futuro |
+| V0.6 | LLM Providers & AI Foundation | Completada (`v0.6.0`) |
+| V0.7 | LLM Real Provider & AI Foundation | **Completada / esta version** |
 | V1.0 | Production | Futuro |
 | V2.0 | Documentation Quality Gate | Futuro |
 | V3.0 | Drift Detection | Futuro |
+| — | Confluence Integration | Futuro, sin numero de version asignado (ver nota mas abajo) |
+
+**Nota (V0.7):** el roadmap tenia asignado V0.7 a "Confluence Integration". La directriz real
+recibida para V0.7 (`prompts/V0.7—LLM-REAL-PROVIDER-&-AI-FOUNDATION.md`) prioriza el primer
+provider LLM real, confirmado explicitamente por el responsable del proyecto. "Confluence
+Integration" se reprograma sin numero fijo, mismo patron ya usado con "LLM Providers" entre V0.5
+y V0.6.
 
 **Nota (V0.5):** el roadmap original asignaba V0.5 a "LLM Providers" y V0.6 a "CLI". La
 directriz real recibida para V0.5 (`prompts/V0.5—CLI-&-DEVELOPER-EXPERIENCE.md`) prioriza la CLI,
@@ -66,8 +73,16 @@ sin reabrir el conflicto de numeracion anterior.
   directamente — independiente de `spring-doc` (la CLI), de `providers/`, y de cualquier
   proveedor LLM concreto; no describe la arquitectura interna del proyecto. Ver
   `docs/03-Arquitectura.md` y `docs/06-LLM.md`.
-- **V0.7 — Confluence Integration:** conexion de la salida OpenAPI con el proyecto Python
-  existente que publica en Confluence.
+- **V0.7 — LLM Real Provider & AI Foundation:** primer provider LLM real, `AnthropicProvider`
+  (`providers/anthropic.py`), implementado unicamente con stdlib (`urllib.request`/`urllib.error`/
+  `json` — sin el SDK `anthropic`, cero dependencias nuevas). Reutiliza `ProviderConfig`/
+  `get_provider`/`providers.errors` de V0.6 sin modificar el contrato de `LLMProvider`;
+  `ProviderConfig` gana un campo aditivo (`timeout`). `FakeProvider` y el registry siguen
+  funcionando igual que antes. Ninguna excepcion de `urllib` se propaga al consumidor: todo se
+  traduce a `providers.errors`. Sin integracion con Analyzer/Generator/Validator/CLI/Skill (eso es
+  V0.8). Ver `prompts/V0.7—LLM-REAL-PROVIDER-&-AI-FOUNDATION.md` y `docs/06-LLM.md`.
+- **Confluence Integration:** conexion de la salida OpenAPI con el proyecto Python existente que
+  publica en Confluence. Sin numero de version asignado (ver nota de la tabla de arriba).
 - **V1.0 — Production:** endurecimiento, empaquetado y estabilizacion para uso en produccion.
 - **V2.0 — Documentation Quality Gate:** control de calidad de documentacion como gate en flujos
   de desarrollo.

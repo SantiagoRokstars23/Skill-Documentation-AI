@@ -5,6 +5,31 @@ Todos los cambios relevantes de este proyecto se documentan en este archivo.
 El formato sigue las convenciones de [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/)
 y este proyecto sigue [Semantic Versioning](https://semver.org/lang/es/).
 
+## [0.7.0] - 2026-08-14
+
+### Added
+
+- `providers/anthropic.py`: `AnthropicProvider`, primer provider LLM real del proyecto, implementando `LLMProvider.generate(prompt: str) -> str` sin cambios de contrato. Contra el endpoint de Mensajes de Anthropic (`POST https://api.anthropic.com/v1/messages`), unicamente con `urllib.request`/`urllib.error`/`json` de la libreria estandar — sin el SDK `anthropic`, cero dependencias nuevas.
+- Requiere `api_key` y `model` explicitos en `ProviderConfig`, validados en la construccion (falla antes de cualquier llamada de red): `MissingCredentialError`/`InvalidModelError`. Sin modelo por defecto hardcodeado (decision explicita de Fase 2).
+- `ProviderConfig` gana un campo aditivo, `timeout: float | None = None`, leible desde `SPRING_DOC_LLM_TIMEOUT` (parseo tolerante: valor ausente/invalido queda en `None`, nunca lanza). `AnthropicProvider` aplica un default seguro (60s) cuando no hay uno configurado o no es positivo.
+- Toda excepcion de `urllib` (`TimeoutError`, `HTTPError`, `URLError`) y toda respuesta malformada (JSON invalido, sin bloques de texto) se traduce a `providers.errors` (`ProviderTimeoutError`, `ProviderRequestError`, `InvalidResponseError`) — el consumidor nunca ve una excepcion de `urllib` ni del formato de respuesta de Anthropic.
+- `providers/registry.py`: nueva entrada `"anthropic"`. `"fake"` sigue resolviendo a `FakeProvider` exactamente igual que en V0.6.
+- 28 tests nuevos (352 -> 380): `AnthropicProvider` (construccion, credencial/modelo ausente, request/headers/payload, respuesta valida/sin contenido/JSON invalido, timeout de lectura y de conexion, HTTP 4xx/5xx, error de conexion, credencial nunca expuesta, registry resuelve `"anthropic"`, `FakeProvider` sigue funcionando, timeout configurado/default/no positivo), `ProviderConfig.timeout`, y aislamiento ampliado (`skill/`/`skills/` tampoco importan `providers`, importar `providers/` no dispara `urlopen`). Ningun test hace una llamada de red real.
+- **Correccion en revision pre-commit:** un timeout durante la fase de conexion/envio de la request (a diferencia de uno durante la lectura de la respuesta) llega envuelto por `urllib` como `URLError(reason=TimeoutError(...))`, no como `TimeoutError` directo — el `except TimeoutError` no lo capturaba, y se clasificaba incorrectamente como `ProviderRequestError` en vez de `ProviderTimeoutError`. Corregido en `providers/anthropic.py` inspeccionando `exc.reason` dentro del handler de `URLError`, con test de regresion dedicado.
+
+### Changed
+
+- `pyproject.toml`: version `0.6.0` -> `0.7.0`. Ninguna dependencia de runtime ni dev nueva.
+- `providers/__init__.py`, `providers/base.py`: docstrings actualizados; `AnthropicProvider` exportado.
+- `docs/12-Roadmap.md`, `docs/13-Versionado.md`, `docs/03-Arquitectura.md`, `docs/06-LLM.md`, `README.md`: actualizados para reflejar el primer provider LLM real.
+
+### Scope
+
+- No se implemento RAG, embeddings, vector databases, agentes, MCP, tool calling, memoria, chat, Confluence, Jira, GitHub, CI/CD, generacion automatica de documentacion mediante LLM, GUI, entrenamiento/fine-tuning de modelos. Ver `docs/12-Roadmap.md`.
+- **Sin integracion del LLM con ningun consumidor real**: `analyzer/`, `generators/`, `validator/`, `cli/`, `skill/` y `skills/` no se modificaron y siguen sin importar `providers/` (verificado por grep y por tests de aislamiento ampliados). La CLI no gana comandos nuevos (`spring-doc ai`/`chat`/`ask`/`document` no existen) ni cambia el comportamiento de `analyze`/`generate`/`validate`. Esa integracion pertenece a V0.8.
+- Un solo provider real (Anthropic) — no se implementaron multiples proveedores comerciales solo para demostrar compatibilidad.
+- **Reasignacion de version autorizada explicitamente:** el roadmap tenia asignado V0.7 a "Confluence Integration". La directriz real de V0.7 prioriza el primer provider LLM real; "Confluence Integration" se reprograma sin numero de version fijo (ver `docs/12-Roadmap.md`).
+
 ## [0.6.0] - 2026-08-14
 
 ### Added

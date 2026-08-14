@@ -205,3 +205,63 @@ agente/proveedor concreto, menciones de `spring-doc` -si las hay- quedan enmarca
 opcionales, ensena los principios de evidencia esperados y la cobertura de completitud OpenAPI
 descrita arriba, y es autocontenido), y la regresion de `cli/commands.py::run_validate` sobre
 archivos no-UTF-8/no legibles (ver mas arriba).
+
+### V0.6.0 -> V0.7.0
+
+**Sin cambios en `analyzer/`, `generators/`, `validator/`, `cli/` ni `skill/`/`skills/`.** V0.7
+(LLM Real Provider & AI Foundation) no modifico ningun archivo de esos paquetes; verificado por
+grep (ninguno referencia `providers`) y por tests de aislamiento (`tests/test_providers_isolation.py`,
+ampliado para cubrir tambien `skill/`/`skills/` y para verificar que importar `providers/` nunca
+dispara una llamada de red).
+
+`providers/base.py` (`LLMProvider`) **no cambio su contrato**
+(`generate(self, prompt: str) -> str`, sin cambios desde V0.1). Cambios dentro de `providers/`:
+
+- **`providers/anthropic.py` (nuevo):** `AnthropicProvider`, primer provider LLM real del
+  proyecto. Implementado unicamente con `urllib.request`/`urllib.error`/`json` (stdlib) contra el
+  endpoint de Mensajes de Anthropic (`POST https://api.anthropic.com/v1/messages`) — sin el SDK
+  `anthropic`, sin ninguna dependencia nueva. Requiere `api_key` y `model` explicitos en la
+  construccion (falla rapido con `MissingCredentialError`/`InvalidModelError` antes de cualquier
+  llamada de red); **sin modelo por defecto hardcodeado** (decision explicita de Fase 2: un
+  default se volveria silenciosamente obsoleto a medida que Anthropic publica modelos nuevos, y
+  elegir un modelo no solicitado es una suposicion, igual que inventar informacion sobre codigo
+  Java). Timeout configurable via `ProviderConfig.timeout`, con `DEFAULT_TIMEOUT_SECONDS = 60.0`
+  como valor seguro cuando no se configura. Toda excepcion de `urllib` (`TimeoutError`,
+  `HTTPError`, `URLError`) y toda respuesta malformada (JSON invalido, sin bloques de texto) se
+  traduce a `providers.errors` — el consumidor nunca ve una excepcion de `urllib` ni del formato
+  de respuesta de Anthropic.
+- **`providers/config.py`:** `ProviderConfig` gana un campo aditivo, `timeout: float | None = None`,
+  y `from_env()` lee `SPRING_DOC_LLM_TIMEOUT` (parseo tolerante: valor ausente o no numerico
+  queda en `None`, nunca lanza). Compatible con toda construccion existente de V0.6 (nuevo campo
+  con default, no rompe `ProviderConfig(provider=...)` posicional/keyword ya en uso).
+- **`providers/registry.py`:** nueva entrada `"anthropic": lambda config: AnthropicProvider(config)`.
+  `"fake"` sigue resolviendo a `FakeProvider` exactamente igual que en V0.6; `UnknownProviderError`
+  sigue funcionando para nombres desconocidos.
+- **`providers/__init__.py`:** exporta `AnthropicProvider` ademas de todo lo ya exportado en V0.6.
+
+**Ninguna dependencia nueva**, runtime ni dev: `urllib`/`json` son libreria estandar.
+
+**Sin integracion con ningun consumidor real** (Analyzer/Generator/Validator/CLI/Skill): la
+directriz de V0.7 lo prohibe explicitamente (esa capacidad es V0.8). La CLI no gana ningun
+comando nuevo (`spring-doc ai`/`chat`/`ask`/`document` no existen) ni cambia el comportamiento de
+`analyze`/`generate`/`validate`.
+
+28 tests nuevos (352 -> 380): `AnthropicProvider` (construccion, credencial/modelo ausente,
+formato exacto de request/headers/payload, parseo de respuesta valida, respuesta sin contenido
+esperado, JSON invalido, timeout de lectura y de conexion, HTTP 4xx/5xx, error de conexion,
+credencial nunca expuesta en excepciones/`repr`/`str`, registry resuelve `"anthropic"`,
+`FakeProvider` sigue funcionando, timeout configurado/por defecto/no positivo), `ProviderConfig.timeout`
+(default `None`, lectura desde `SPRING_DOC_LLM_TIMEOUT`, valor invalido cae a `None`, construccion
+explicita), y aislamiento ampliado (`skill/`/`skills/` tampoco importan `providers`, importar
+`providers/` no dispara `urlopen`). Ningun test hace una llamada de red real: todos mockean
+`urllib.request.urlopen` con `unittest.mock`.
+
+**Correccion en revision pre-commit:** un timeout durante la fase de conexion/envio de la request
+(a diferencia de uno durante la lectura de la respuesta) llega envuelto por `urllib.request` como
+`URLError(reason=TimeoutError(...))`, no como `TimeoutError` directo (`do_open` captura cualquier
+`OSError` —`TimeoutError` es subclase— durante `h.request(...)` y lo re-lanza envuelto; el
+timeout durante `h.getresponse()`, en cambio, no esta dentro de ese `try`, y propaga como
+`TimeoutError` directo). El `except TimeoutError` original solo cubria el segundo caso;
+`providers/anthropic.py` ahora inspecciona `exc.reason` dentro del handler de `URLError` para
+clasificar tambien el primero como `ProviderTimeoutError` en vez de `ProviderRequestError`, con
+test de regresion dedicado.

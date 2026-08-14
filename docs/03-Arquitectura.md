@@ -101,7 +101,7 @@ ejecutable, Auditor, Integraciones) permanecen delimitados y documentados, pero 
 - **Dependencias:** consume la salida del Analyzer; no depende de ningun LLM concreto.
 - Detalle en `docs/04-Skill.md`.
 
-### LLM Provider (interfaz definida en V0.1, infraestructura ampliada en V0.6)
+### LLM Provider (interfaz definida en V0.1, infraestructura V0.6, primer provider real en V0.7)
 
 - **Responsabilidad:** exponer una interfaz uniforme para invocar un LLM, independientemente del
   proveedor concreto (Claude, Gemini, OpenAI, u otros compatibles).
@@ -110,21 +110,30 @@ ejecutable, Auditor, Integraciones) permanecen delimitados y documentados, pero 
 - **Dependencias:** ninguna dependencia arquitectonica de componentes superiores hacia un
   proveedor especifico. Ver `docs/06-LLM.md`.
 - **Contrato (`providers/base.py`):** `LLMProvider.generate(self, prompt: str) -> str`. Sin
-  cambios desde V0.1 — V0.6 no modifico esta interfaz.
-- **Estructura interna (V0.6):**
+  cambios desde V0.1 — ni V0.6 ni V0.7 modificaron esta interfaz.
+- **Estructura interna:**
   - `providers/config.py` — `ProviderConfig` (dataclass inmutable: `provider`, `model`,
-    `api_key`), con `from_env()` leyendo variables de entorno (`SPRING_DOC_LLM_PROVIDER`/
-    `_MODEL`/`_API_KEY`). `api_key` nunca aparece en `repr()`/`str()`.
+    `api_key`, `timeout` desde V0.7), con `from_env()` leyendo variables de entorno
+    (`SPRING_DOC_LLM_PROVIDER`/`_MODEL`/`_API_KEY`/`_TIMEOUT`). `api_key` nunca aparece en
+    `repr()`/`str()`.
   - `providers/errors.py` — jerarquia propia (`LLMProviderError` + 7 subclases) para que ningun
-    consumidor necesite conocer excepciones de un SDK concreto.
-  - `providers/fake.py` — `FakeProvider`: unica implementacion concreta de `LLMProvider` en V0.6,
-    determinista, sin red ni credenciales.
+    consumidor necesite conocer excepciones de un SDK concreto ni de `urllib`.
+  - `providers/fake.py` — `FakeProvider`: implementacion determinista sin red ni credenciales,
+    pensada para tests (V0.6).
+  - `providers/anthropic.py` — `AnthropicProvider` (V0.7): primer provider LLM real, contra el
+    endpoint de Mensajes de Anthropic, implementado solo con `urllib.request`/`urllib.error`/
+    `json` (stdlib, sin el SDK `anthropic`). Requiere `api_key`/`model` explicitos (sin modelo por
+    defecto), falla en la construccion si faltan. Traduce toda excepcion de `urllib` y toda
+    respuesta malformada a `providers.errors`.
   - `providers/registry.py` — `get_provider(config) -> LLMProvider`: seleccion por nombre sobre
     un `dict[str, Callable]` (deliberadamente no una clase Factory ni un sistema de plugins).
-- **Estado en V0.6:** infraestructura completa y probada; **ningun provider comercial real**
-  (decision explicita, ver `docs/13-Versionado.md` seccion "V0.5.0 -> V0.6.0" y decision
-  arquitectonica 11 mas abajo). Ningun otro componente (`analyzer/`, `generators/`, `validator/`,
-  `cli/`) importa `providers/` — verificado por grep y por tests de aislamiento.
+    Resuelve `"fake"` → `FakeProvider`, `"anthropic"` → `AnthropicProvider`.
+- **Estado en V0.7:** infraestructura completa y probada, con un provider comercial real
+  (`AnthropicProvider`) ademas del `FakeProvider` de V0.6 (decision de alcance explicita: un solo
+  provider real, ver `docs/13-Versionado.md` seccion "V0.6.0 -> V0.7.0" y decision arquitectonica
+  12 mas abajo). Ningun otro componente (`analyzer/`, `generators/`, `validator/`, `cli/`,
+  `skill/`, `skills/`) importa `providers/` — verificado por grep y por tests de aislamiento.
+  Ningun consumidor real usa todavia `AnthropicProvider` (eso es V0.8).
 
 ### OpenAPI Generator (implementado en V0.3)
 
@@ -318,6 +327,13 @@ estaban) ni `generators/` (el Validator consume el `dict` de salida, no llama a 
   Skill/LLM Provider; V0.6 confirma que tampoco lo hacen Generator/Validator/CLI, verificado por
   grep y por `tests/test_providers_isolation.py`). Ningun componente existente adquirio una
   dependencia implicita sobre Providers.
+- (V0.7) El mismo limite se sostiene con `AnthropicProvider` disponible: agregar un provider real
+  no cambio el aislamiento en absoluto — `analyzer/`, `generators/`, `validator/`, `cli/`,
+  `skill/` y `skills/` siguen sin referenciar `providers/` (verificado por grep, extendido ahora
+  tambien a `skill/`/`skills/`), y el proyecto funciona igual sin ninguna variable
+  `SPRING_DOC_LLM_*` configurada. Instalar el paquete o importar `providers/` nunca dispara una
+  llamada de red (verificado por test dedicado que mockea `urllib.request.urlopen` y comprueba que
+  no se invoca solo por importar).
 
 ## Decisiones arquitectonicas relevantes
 
@@ -464,3 +480,30 @@ estaban) ni `generators/` (el Validator consume el `dict` de salida, no llama a 
     directamente, sin depender de `spring-doc` ni describir la arquitectura interna de este
     proyecto — ver seccion "Componentes" mas arriba para el detalle y la nota de nomenclatura
     frente a `skill/`, singular).
+
+12. **V0.7 — `AnthropicProvider` real via stdlib, sin SDK, sin modificar el contrato de
+    `LLMProvider` ni ningun otro componente.** La decision "sin provider real" de V0.6 (punto 11)
+    se revierte explicitamente aqui, con autorizacion del responsable del proyecto: un solo
+    provider real (no varios, "no se implementan multiples proveedores comerciales unicamente
+    para demostrar compatibilidad" — misma prioridad que V0.6). Decisiones explicitas de Fase 2:
+    - **Modelo obligatorio, sin default hardcodeado** (`InvalidModelError` si falta): un modelo
+      por defecto se volveria silenciosamente obsoleto a medida que Anthropic publica modelos
+      nuevos, y elegir uno no solicitado es una suposicion — mismo principio de evidencia que
+      gobierna el Analyzer, aplicado ahora a la configuracion del provider. `InvalidModelError` se
+      limita a la ausencia local del dato; un nombre de modelo que Anthropic rechace en tiempo
+      real llega como HTTP 4xx y se traduce a `ProviderRequestError`, no a `InvalidModelError` —
+      no hay forma de validar un nombre de modelo sin red ni una lista hardcodeada, igual de
+      fragil que un default.
+    - **Timeout con default seguro (60s) resuelto en el provider, no en `ProviderConfig`**:
+      `ProviderConfig.timeout` (campo aditivo nuevo) solo transporta el valor configurado (o
+      `None`); `AnthropicProvider` decide el default cuando no hay uno valido, nunca se pasa
+      `timeout=None` a `urlopen` (evitaria un timeout de socket potencialmente indefinido).
+    - **`max_tokens` fijo (1024), no configurable**: la API de Anthropic lo exige en cada request,
+      pero la directriz no pidio exponerlo como opcion nueva — agregar esa superficie no
+      solicitada violaria la regla de "no funcionalidades especulativas".
+    - Todas las excepciones de `urllib` (`TimeoutError`, `HTTPError`, `URLError`) y toda respuesta
+      malformada (JSON invalido, sin bloques de texto) se traducen a `providers.errors` dentro del
+      propio provider — ningun detalle de `urllib` ni del formato de respuesta de Anthropic se
+      propaga hacia el consumidor.
+    - Ver `docs/13-Versionado.md` seccion "V0.6.0 -> V0.7.0" para el detalle completo del formato
+      de request/response y la tabla de traduccion de errores.

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "skill-documentation-ai"
-version = "0.6.0"
+version = "0.7.0"
 description = "Motor de documentacion inteligente para microservicios Java/Spring Boot"
 readme = "README.md"
 requires-python = ">=3.11"
